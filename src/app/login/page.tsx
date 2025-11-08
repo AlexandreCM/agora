@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useSession } from "@/components/session-provider";
+
+function normaliseRedirect(target: string | null): string {
+  if (!target) {
+    return "/";
+  }
+
+  const trimmed = target.trim();
+
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return "/";
+  }
+
+  return trimmed;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,12 +29,16 @@ export default function LoginPage() {
   const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [error, setError] = useState<string | null>(null);
 
+  const redirectTarget = useMemo(
+    () => normaliseRedirect(searchParams.get("from")),
+    [searchParams],
+  );
+
   useEffect(() => {
     if (user) {
-      const redirectTo = searchParams.get("from") ?? "/";
-      router.replace(redirectTo);
+      router.replace(redirectTarget);
     }
-  }, [user, router, searchParams]);
+  }, [user, router, redirectTarget]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,8 +65,7 @@ export default function LoginPage() {
       const authenticatedUser = await response.json();
       setUser(authenticatedUser);
 
-      const redirectTo = searchParams.get("from") ?? "/";
-      router.replace(redirectTo);
+      router.replace(redirectTarget);
       router.refresh();
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "Identifiants invalides.");

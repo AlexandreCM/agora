@@ -40,7 +40,7 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
   const likedBy = normaliseLikedBy(rawPost.likedBy);
   const baseLikes =
     typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes) ? rawPost.likes : 0;
-  const likes = likedBy.length > 0 ? likedBy.length : baseLikes;
+  const likes = baseLikes + likedBy.length;
 
   return {
     id,
@@ -89,11 +89,9 @@ function buildPostFilter(id: string): Filter<MongoPostDocument> {
 function toPostForViewer(post: NormalisedPost, viewerId?: string): Post {
   const { likedBy, ...rest } = post;
   const viewerHasLiked = viewerId ? likedBy.includes(viewerId) : undefined;
-  const likeCount = likedBy.length > 0 ? likedBy.length : rest.likes;
 
   return {
     ...rest,
-    likes: likeCount,
     viewerHasLiked,
   };
 }
