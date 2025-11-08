@@ -22,6 +22,10 @@ export function PostCard({ post }: PostCardProps) {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.currentTarget !== event.target) {
+      return;
+    }
+
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       handleNavigate();
