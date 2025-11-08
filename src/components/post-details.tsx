@@ -144,6 +144,7 @@ export function PostDetails({ post }: PostDetailsProps) {
       setContent("");
       setFeedback("Votre contribution a bien été publiée.");
       setActiveTab(selectedSection);
+      router.refresh();
     } catch (commentError) {
       setError(commentError instanceof Error ? commentError.message : "Une erreur est survenue.");
     } finally {
@@ -199,6 +200,7 @@ export function PostDetails({ post }: PostDetailsProps) {
       setActiveReplyComment(null);
       setExpandedReplies((previous) => ({ ...previous, [commentId]: true }));
       setFeedback("Merci pour votre réponse !");
+      router.refresh();
     } catch (replyError) {
       const message = replyError instanceof Error ? replyError.message : "Une erreur est survenue.";
       setReplyErrors((previous) => ({ ...previous, [commentId]: message }));
