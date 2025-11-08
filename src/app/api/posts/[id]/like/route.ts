@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { likePostByUser } from "@/lib/posts";
+import { togglePostLikeByUser } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ message: "Authentification requise." }, { status: 401 });
   }
 
-  const result = await likePostByUser(id, user.id);
+  const result = await togglePostLikeByUser(id, user.id);
   const updatedPost = result.post;
 
   if (!updatedPost) {

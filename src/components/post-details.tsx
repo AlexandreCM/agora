@@ -63,7 +63,7 @@ export function PostDetails({ post }: PostDetailsProps) {
       return;
     }
 
-    if (isLiking || hasLiked) return;
+    if (isLiking) return;
 
     setIsLiking(true);
     setError(null);
@@ -79,7 +79,7 @@ export function PostDetails({ post }: PostDetailsProps) {
 
       const updatedPost = (await response.json()) as Post;
       setLikes(updatedPost.likes);
-      setHasLiked(Boolean(updatedPost.viewerHasLiked ?? true));
+      setHasLiked(Boolean(updatedPost.viewerHasLiked));
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
     } finally {
@@ -160,8 +160,9 @@ export function PostDetails({ post }: PostDetailsProps) {
           className="interaction-button"
           type="button"
           onClick={handleLike}
-          disabled={isLiking || hasLiked}
-          aria-label={hasLiked ? "Vous avez déjà aimé ce rapport" : "J'aime ce rapport"}
+          disabled={isLiking}
+          aria-pressed={hasLiked}
+          aria-label={hasLiked ? "Retirer votre appréciation" : "J'aime ce rapport"}
         >
           ❤️ {likes}
         </button>
