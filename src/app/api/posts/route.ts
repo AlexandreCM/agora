@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { readPosts, writePosts } from "@/lib/posts";
+import { createPost, readPosts } from "@/lib/posts";
 import type { Post } from "@/types/post";
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "changeme";
@@ -88,9 +88,7 @@ export async function POST(request: NextRequest) {
     comments: [],
   };
 
-  const posts = await readPosts();
-  const updatedPosts = [newPost, ...posts];
-  await writePosts(updatedPosts);
+  const createdPost = await createPost(newPost);
 
-  return NextResponse.json(newPost, { status: 201 });
+  return NextResponse.json(createdPost, { status: 201 });
 }
