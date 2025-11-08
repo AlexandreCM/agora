@@ -4,11 +4,28 @@ import { getDb } from "@/lib/mongodb";
 import { COMMENT_SECTIONS } from "@/types/post";
 import type { Comment, CommentSection, Post } from "@/types/post";
 
-type MongoPostDocument = Post & { _id?: string | ObjectId };
+type MongoPostDocument = Omit<Post, "viewerHasLiked"> & {
+  _id?: string | ObjectId;
+  likedBy?: (string | ObjectId)[];
+};
+
+interface NormalisedPost extends Omit<Post, "viewerHasLiked"> {
+  likedBy: string[];
+}
 
 const POSTS_COLLECTION = "posts";
 
-function ensurePostShape(rawPost: Partial<MongoPostDocument>): Post {
+function normaliseLikedBy(rawLikedBy: MongoPostDocument["likedBy"]): string[] {
+  if (!Array.isArray(rawLikedBy)) {
+    return [];
+  }
+
+  return rawLikedBy
+    .map((value) => (value instanceof ObjectId ? value.toHexString() : String(value)))
+    .filter((value) => Boolean(value));
+}
+
+function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
   const comments = Array.isArray(rawPost.comments)
     ? rawPost.comments.map((comment) => ensureCommentShape(comment))
     : [];
@@ -20,6 +37,11 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): Post {
     ? parsedCreatedAt.toISOString()
     : new Date().toISOString();
 
+  const likedBy = normaliseLikedBy(rawPost.likedBy);
+  const baseLikes =
+    typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes) ? rawPost.likes : 0;
+  const likes = likedBy.length > 0 ? likedBy.length : baseLikes;
+
   return {
     id,
     title: String(rawPost.title ?? ""),
@@ -27,11 +49,9 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): Post {
     sourceUrl: String(rawPost.sourceUrl ?? ""),
     tags: Array.isArray(rawPost.tags) ? rawPost.tags.map((tag) => String(tag)) : [],
     createdAt,
-    likes:
-      typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes)
-        ? rawPost.likes
-        : 0,
+    likes,
     comments,
+    likedBy,
   };
 }
 
@@ -50,6 +70,7 @@ function ensureCommentShape(rawComment: Partial<Comment>): Comment {
     id: String(rawComment.id ?? ""),
     section,
     author: rawComment.author ? String(rawComment.author) : "Anonyme",
+    authorId: rawComment.authorId ? String(rawComment.authorId) : undefined,
     content: String(rawComment.content ?? ""),
     createdAt,
   };
@@ -65,7 +86,19 @@ function buildPostFilter(id: string): Filter<MongoPostDocument> {
   return { $or: filters } as Filter<MongoPostDocument>;
 }
 
-export async function readPosts(): Promise<Post[]> {
+function toPostForViewer(post: NormalisedPost, viewerId?: string): Post {
+  const { likedBy, ...rest } = post;
+  const viewerHasLiked = viewerId ? likedBy.includes(viewerId) : undefined;
+  const likeCount = likedBy.length > 0 ? likedBy.length : rest.likes;
+
+  return {
+    ...rest,
+    likes: likeCount,
+    viewerHasLiked,
+  };
+}
+
+export async function readPosts(viewerId?: string): Promise<Post[]> {
   const db = await getDb();
   const documents = await db
     .collection<MongoPostDocument>(POSTS_COLLECTION)
@@ -73,36 +106,53 @@ export async function readPosts(): Promise<Post[]> {
     .sort({ createdAt: -1 })
     .toArray();
 
-  const posts = documents.map((document) => ensurePostShape(document));
+  const normalised = documents.map((document) => ensurePostShape(document));
+  const posts = normalised.map((post) => toPostForViewer(post, viewerId));
 
   return posts.sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
   );
 }
 
-export async function readPostById(id: string): Promise<Post | null> {
+export async function readPostById(id: string, viewerId?: string): Promise<Post | null> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
   const filter = buildPostFilter(id);
 
   const document = await collection.findOne(filter);
 
-  return document ? ensurePostShape(document) : null;
+  if (!document) {
+    return null;
+  }
+
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised, viewerId);
 }
 
 export async function createPost(post: Post): Promise<Post> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
-  const ensuredPost = ensurePostShape(post);
-
-  if (!ensuredPost.id) {
+  if (!post.id) {
     throw new Error("Post id is required");
   }
 
-  await collection.insertOne({ ...ensuredPost, _id: ensuredPost.id });
+  const document: MongoPostDocument = {
+    id: post.id,
+    title: post.title,
+    summary: post.summary,
+    sourceUrl: post.sourceUrl,
+    tags: post.tags,
+    createdAt: post.createdAt,
+    likes: 0,
+    comments: post.comments.map((comment) => ensureCommentShape(comment)),
+    likedBy: [],
+  };
 
-  return ensuredPost;
+  await collection.insertOne({ ...document, _id: document.id });
+
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised);
 }
 
 export async function findPostBySourceUrl(sourceUrl: string): Promise<Post | null> {
@@ -111,7 +161,12 @@ export async function findPostBySourceUrl(sourceUrl: string): Promise<Post | nul
 
   const document = await collection.findOne({ sourceUrl });
 
-  return document ? ensurePostShape(document) : null;
+  if (!document) {
+    return null;
+  }
+
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised);
 }
 
 export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean> {
@@ -123,24 +178,41 @@ export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean>
   return count > 0;
 }
 
-export async function incrementPostLikes(id: string): Promise<Post | null> {
+export async function likePostByUser(
+  id: string,
+  userId: string,
+): Promise<{ post: Post | null; alreadyLiked: boolean }> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
   const filter = buildPostFilter(id);
 
-  const updateResult = await collection.updateOne(filter, { $inc: { likes: 1 } });
+  const updateResult = await collection.updateOne(filter, {
+    $addToSet: { likedBy: userId },
+  });
 
   if (!updateResult.matchedCount) {
-    return null;
+    return { post: null, alreadyLiked: false };
   }
 
   const updatedDocument = await collection.findOne(filter);
 
-  return updatedDocument ? ensurePostShape(updatedDocument) : null;
+  if (!updatedDocument) {
+    return { post: null, alreadyLiked: false };
+  }
 
+  const normalised = ensurePostShape(updatedDocument);
+
+  return {
+    post: toPostForViewer(normalised, userId),
+    alreadyLiked: updateResult.modifiedCount === 0,
+  };
 }
 
-export async function addCommentToPost(id: string, comment: Comment): Promise<Post | null> {
+export async function addCommentToPost(
+  id: string,
+  comment: Comment,
+  viewerId?: string,
+): Promise<Post | null> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
@@ -155,5 +227,10 @@ export async function addCommentToPost(id: string, comment: Comment): Promise<Po
 
   const updatedDocument = await collection.findOne(filter);
 
-  return updatedDocument ? ensurePostShape(updatedDocument) : null;
+  if (!updatedDocument) {
+    return null;
+  }
+
+  const normalised = ensurePostShape(updatedDocument);
+  return toPostForViewer(normalised, viewerId);
 }

@@ -1,29 +1,31 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+
+import { getCurrentUser } from "@/lib/auth";
 import { createPost, readPosts } from "@/lib/posts";
 import type { Post } from "@/types/post";
-
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "changeme";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const posts = await readPosts();
+  const user = await getCurrentUser();
+  const posts = await readPosts(user?.id);
   return NextResponse.json(posts);
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const providedToken = request.headers.get("x-admin-token") ?? body?.token;
+  const user = await getCurrentUser();
 
-  if (!providedToken || providedToken !== ADMIN_TOKEN) {
+  if (!user || user.role !== "admin") {
     return NextResponse.json(
       {
-        message: "Jeton administrateur invalide.",
+        message: "Accès administrateur requis.",
       },
-      { status: 401 },
+      { status: 403 },
     );
   }
+
+  const body = await request.json().catch(() => null);
 
   if (!body) {
     return NextResponse.json(

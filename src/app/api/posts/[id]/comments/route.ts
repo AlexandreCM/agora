@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 import { addCommentToPost } from "@/lib/posts";
 import { COMMENT_SECTIONS, type Comment, type CommentSection, type Post } from "@/types/post";
 
@@ -22,15 +23,20 @@ function normaliseSection(section: unknown): CommentSection {
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = context.params;
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ message: "Authentification requise." }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => null);
 
   if (!body) {
     return NextResponse.json({ message: "Corps de requête manquant." }, { status: 400 });
   }
 
-  const { section, author, content } = body as {
+  const { section, content } = body as {
     section?: unknown;
-    author?: unknown;
     content?: unknown;
   };
 
@@ -39,17 +45,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const normalisedSection = normaliseSection(section);
-  const normalisedAuthor = typeof author === "string" && author.trim().length > 0 ? author.trim() : "Anonyme";
 
   const newComment: Comment = {
     id: randomUUID(),
     section: normalisedSection,
-    author: normalisedAuthor,
+    author: user.name,
+    authorId: user.id,
     content: content.trim(),
     createdAt: new Date().toISOString(),
   };
 
-  const updatedPost: Post | null = await addCommentToPost(id, newComment);
+  const updatedPost: Post | null = await addCommentToPost(id, newComment, user.id);
 
   if (!updatedPost) {
     return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });

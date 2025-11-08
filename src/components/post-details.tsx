@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { COMMENT_SECTIONS, type Comment, type CommentSection, type Post } from "@/types/post";
+import { useSession } from "@/components/session-provider";
 
 const SECTION_LABELS: Record<CommentSection, string> = {
   analysis: "Analyse",
@@ -32,8 +35,11 @@ interface PostDetailsProps {
 }
 
 export function PostDetails({ post }: PostDetailsProps) {
+  const router = useRouter();
+  const { user } = useSession();
   const [likes, setLikes] = useState(post.likes);
   const [isLiking, setIsLiking] = useState(false);
+  const [hasLiked, setHasLiked] = useState(Boolean(post.viewerHasLiked));
   const [comments, setComments] = useState<Comment[]>(post.comments);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +49,21 @@ export function PostDetails({ post }: PostDetailsProps) {
     const firstWithComments = COMMENT_SECTIONS.find((section) => grouped[section].length > 0);
     return firstWithComments ?? COMMENT_SECTIONS[0];
   });
-  const [author, setAuthor] = useState("");
   const [content, setContent] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  const isAuthenticated = Boolean(user);
   const commentsBySection = useMemo(() => groupComments(comments), [comments]);
   const activeComments = commentsBySection[activeTab];
 
   async function handleLike() {
-    if (isLiking) return;
+    if (!user) {
+      setError("Connectez-vous pour aimer les rapports.");
+      router.push(`/login?from=/posts/${post.id}`);
+      return;
+    }
+
+    if (isLiking || hasLiked) return;
 
     setIsLiking(true);
     setError(null);
@@ -67,6 +79,7 @@ export function PostDetails({ post }: PostDetailsProps) {
 
       const updatedPost = (await response.json()) as Post;
       setLikes(updatedPost.likes);
+      setHasLiked(Boolean(updatedPost.viewerHasLiked ?? true));
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
     } finally {
@@ -76,6 +89,12 @@ export function PostDetails({ post }: PostDetailsProps) {
 
   async function handleSubmitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!user) {
+      setError("Connectez-vous pour participer aux discussions.");
+      router.push(`/login?from=/posts/${post.id}`);
+      return;
+    }
 
     if (isSubmittingComment) return;
 
@@ -91,7 +110,6 @@ export function PostDetails({ post }: PostDetailsProps) {
         },
         body: JSON.stringify({
           section: selectedSection,
-          author,
           content,
         }),
       });
@@ -104,7 +122,6 @@ export function PostDetails({ post }: PostDetailsProps) {
       const updatedPost = (await response.json()) as Post;
       setComments(updatedPost.comments);
       setContent("");
-      setAuthor("");
       setFeedback("Votre contribution a bien été publiée.");
       setActiveTab(selectedSection);
     } catch (commentError) {
@@ -143,8 +160,8 @@ export function PostDetails({ post }: PostDetailsProps) {
           className="interaction-button"
           type="button"
           onClick={handleLike}
-          disabled={isLiking}
-          aria-label="J'aime ce rapport"
+          disabled={isLiking || hasLiked}
+          aria-label={hasLiked ? "Vous avez déjà aimé ce rapport" : "J'aime ce rapport"}
         >
           ❤️ {likes}
         </button>
@@ -152,48 +169,49 @@ export function PostDetails({ post }: PostDetailsProps) {
 
       <section className="comment-section">
         <h3>Contribuer</h3>
-        <form className="comment-form" onSubmit={handleSubmitComment}>
-          <div className="comment-grid">
+        {isAuthenticated ? (
+          <form className="comment-form" onSubmit={handleSubmitComment}>
+            <div className="comment-grid">
+              <label className="field">
+                <span>Type de contribution</span>
+                <select
+                  value={selectedSection}
+                  onChange={(event) => setSelectedSection(event.target.value as CommentSection)}
+                >
+                  {COMMENT_SECTIONS.map((section) => (
+                    <option key={section} value={section}>
+                      {SECTION_LABELS[section]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="current-user">Connecté en tant que <strong>{user?.name ?? "Membre"}</strong></p>
             <label className="field">
-              <span>Type de contribution</span>
-              <select
-                value={selectedSection}
-                onChange={(event) => setSelectedSection(event.target.value as CommentSection)}
-              >
-                {COMMENT_SECTIONS.map((section) => (
-                  <option key={section} value={section}>
-                    {SECTION_LABELS[section]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Nom (optionnel)</span>
-              <input
-                type="text"
-                value={author}
-                onChange={(event) => setAuthor(event.target.value)}
-                placeholder="Votre nom ou pseudonyme"
+              <span>Commentaire</span>
+              <textarea
+                required
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="Partagez votre analyse, question, proposition ou avis"
               />
             </label>
-          </div>
-          <label className="field">
-            <span>Commentaire</span>
-            <textarea
-              required
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="Partagez votre analyse, question, proposition ou avis"
-            />
-          </label>
+            <div className="comment-feedback">
+              {feedback && <p className="feedback success">{feedback}</p>}
+              {error && <p className="feedback error">{error}</p>}
+            </div>
+            <button className="submit-button" type="submit" disabled={isSubmittingComment}>
+              {isSubmittingComment ? "Publication en cours…" : "Publier"}
+            </button>
+          </form>
+        ) : (
           <div className="comment-feedback">
-            {feedback && <p className="feedback success">{feedback}</p>}
+            <p className="feedback info">
+              <Link href={`/login?from=/posts/${post.id}`}>Connectez-vous</Link> pour contribuer aux discussions.
+            </p>
             {error && <p className="feedback error">{error}</p>}
           </div>
-          <button className="submit-button" type="submit" disabled={isSubmittingComment}>
-            {isSubmittingComment ? "Publication en cours…" : "Publier"}
-          </button>
-        </form>
+        )}
       </section>
 
       <section className="comment-discussions">

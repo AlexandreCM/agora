@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getCurrentUser } from "@/lib/auth";
 import { createRssFeed, readRssFeeds, updateRssFeed } from "@/lib/rss-feeds";
 import { importPostsFromFeed } from "@/lib/rss-importer";
-
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "changeme";
 
 export const dynamic = "force-dynamic";
 
@@ -13,15 +12,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const providedToken = request.headers.get("x-admin-token") ?? body?.token;
+  const user = await getCurrentUser();
 
-  if (!providedToken || providedToken !== ADMIN_TOKEN) {
-    return NextResponse.json(
-      { message: "Jeton administrateur invalide." },
-      { status: 401 },
-    );
+  if (!user || user.role !== "admin") {
+    return NextResponse.json({ message: "Accès administrateur requis." }, { status: 403 });
   }
+
+  const body = await request.json().catch(() => null);
 
   if (!body) {
     return NextResponse.json(

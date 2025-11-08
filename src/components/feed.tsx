@@ -1,8 +1,10 @@
+import { getCurrentUser } from "@/lib/auth";
 import { readPosts } from "@/lib/posts";
 import { PostCard } from "@/components/post-card";
 
 export async function Feed() {
-  const posts = await readPosts();
+  const user = await getCurrentUser();
+  const posts = await readPosts(user?.id);
 
   if (posts.length === 0) {
     return (

@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getCurrentUser } from "@/lib/auth";
 import { deleteRssFeed, getRssFeed, updateRssFeed } from "@/lib/rss-feeds";
 import type { UpdateRssFeedInput } from "@/lib/rss-feeds";
 import { importPostsFromFeed } from "@/lib/rss-importer";
-
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "changeme";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
-  const body = await request.json().catch(() => null);
-  const providedToken = request.headers.get("x-admin-token") ?? body?.token;
+  const user = await getCurrentUser();
 
-  if (!providedToken || providedToken !== ADMIN_TOKEN) {
-    return NextResponse.json(
-      { message: "Jeton administrateur invalide." },
-      { status: 401 },
-    );
+  if (!user || user.role !== "admin") {
+    return NextResponse.json({ message: "Accès administrateur requis." }, { status: 403 });
   }
+
+  const body = await request.json().catch(() => null);
 
   if (!body) {
     return NextResponse.json(
@@ -104,13 +101,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
-  const providedToken = request.headers.get("x-admin-token");
+  const user = await getCurrentUser();
 
-  if (!providedToken || providedToken !== ADMIN_TOKEN) {
-    return NextResponse.json(
-      { message: "Jeton administrateur invalide." },
-      { status: 401 },
-    );
+  if (!user || user.role !== "admin") {
+    return NextResponse.json({ message: "Accès administrateur requis." }, { status: 403 });
   }
 
   const deleted = await deleteRssFeed(id);
