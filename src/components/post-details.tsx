@@ -51,10 +51,30 @@ export function PostDetails({ post }: PostDetailsProps) {
   });
   const [content, setContent] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [replyContents, setReplyContents] = useState<Record<string, string>>({});
+  const [replySubmitting, setReplySubmitting] = useState<Partial<Record<string, boolean>>>({});
+  const [replyErrors, setReplyErrors] = useState<Partial<Record<string, string | null>>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Partial<Record<string, boolean>>>({});
+  const [activeReplyComment, setActiveReplyComment] = useState<string | null>(null);
 
   const isAuthenticated = Boolean(user);
   const commentsBySection = useMemo(() => groupComments(comments), [comments]);
   const activeComments = commentsBySection[activeTab];
+
+  function toggleReplyForm(commentId: string) {
+    if (!user) {
+      setError("Connectez-vous pour participer aux discussions.");
+      router.push(`/login?from=/posts/${post.id}`);
+      return;
+    }
+
+    setActiveReplyComment((current) => (current === commentId ? null : commentId));
+    setReplyErrors((previous) => ({ ...previous, [commentId]: null }));
+  }
+
+  function toggleReplies(commentId: string) {
+    setExpandedReplies((previous) => ({ ...previous, [commentId]: !previous[commentId] }));
+  }
 
   async function handleLike() {
     if (!user) {
@@ -124,10 +144,68 @@ export function PostDetails({ post }: PostDetailsProps) {
       setContent("");
       setFeedback("Votre contribution a bien été publiée.");
       setActiveTab(selectedSection);
+      router.refresh();
     } catch (commentError) {
       setError(commentError instanceof Error ? commentError.message : "Une erreur est survenue.");
     } finally {
       setIsSubmittingComment(false);
+    }
+  }
+
+  async function handleSubmitReply(commentId: string, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!user) {
+      setError("Connectez-vous pour participer aux discussions.");
+      router.push(`/login?from=/posts/${post.id}`);
+      return;
+    }
+
+    if (replySubmitting[commentId]) {
+      return;
+    }
+
+    const value = replyContents[commentId]?.trim();
+
+    if (!value) {
+      setReplyErrors((previous) => ({ ...previous, [commentId]: "Votre réponse ne peut pas être vide." }));
+      return;
+    }
+
+    setReplySubmitting((previous) => ({ ...previous, [commentId]: true }));
+    setReplyErrors((previous) => ({ ...previous, [commentId]: null }));
+    setFeedback(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: value,
+          parentId: commentId,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? "Impossible d'envoyer votre réponse.");
+      }
+
+      const updatedPost = (await response.json()) as Post;
+      setComments(updatedPost.comments);
+      setReplyContents((previous) => ({ ...previous, [commentId]: "" }));
+      setActiveReplyComment(null);
+      setExpandedReplies((previous) => ({ ...previous, [commentId]: true }));
+      setFeedback("Merci pour votre réponse !");
+      router.refresh();
+    } catch (replyError) {
+      const message = replyError instanceof Error ? replyError.message : "Une erreur est survenue.";
+      setReplyErrors((previous) => ({ ...previous, [commentId]: message }));
+    } finally {
+      setReplySubmitting((previous) => ({ ...previous, [commentId]: false }));
     }
   }
 
@@ -249,17 +327,84 @@ export function PostDetails({ post }: PostDetailsProps) {
             <p className="empty-comments">Aucune contribution pour le moment.</p>
           ) : (
             <ul className="comment-items">
-              {activeComments.map((comment) => (
-                <li key={comment.id} className="comment-item">
-                  <div className="comment-meta">
-                    <strong>{comment.author}</strong>
-                    <time dateTime={comment.createdAt}>
-                      {format(new Date(comment.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
-                    </time>
-                  </div>
-                  <p>{comment.content}</p>
-                </li>
-              ))}
+              {activeComments.map((comment) => {
+                const isExpanded = Boolean(expandedReplies[comment.id]);
+                const visibleReplies = isExpanded ? comment.replies : comment.replies.slice(0, 2);
+                const canToggleReplies = comment.replies.length > 2;
+                const isReplyFormOpen = activeReplyComment === comment.id;
+                const replyValue = replyContents[comment.id] ?? "";
+                const replyError = replyErrors[comment.id];
+                const isReplySubmitting = Boolean(replySubmitting[comment.id]);
+
+                return (
+                  <li key={comment.id} className="comment-item">
+                    <div className="comment-meta">
+                      <strong>{comment.author}</strong>
+                      <time dateTime={comment.createdAt}>
+                        {format(new Date(comment.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
+                      </time>
+                    </div>
+                    <p>{comment.content}</p>
+                    <div className="comment-actions">
+                      <button
+                        type="button"
+                        className="comment-action-button"
+                        onClick={() => toggleReplyForm(comment.id)}
+                      >
+                        {isReplyFormOpen ? "Annuler" : "Répondre"}
+                      </button>
+                    </div>
+                    {comment.replies.length > 0 && (
+                      <div className="comment-replies">
+                        <ul className="comment-reply-list">
+                          {visibleReplies.map((reply) => (
+                            <li key={reply.id} className="comment-reply">
+                              <div className="comment-reply-meta">
+                                <strong>{reply.author}</strong>
+                                <time dateTime={reply.createdAt}>
+                                  {format(new Date(reply.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
+                                </time>
+                              </div>
+                              <p>{reply.content}</p>
+                            </li>
+                          ))}
+                        </ul>
+                        {canToggleReplies && (
+                          <button
+                            type="button"
+                            className="comment-action-button comment-action-button--secondary"
+                            onClick={() => toggleReplies(comment.id)}
+                          >
+                            {isExpanded ? "Afficher moins" : "Afficher plus"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {isReplyFormOpen && (
+                      <form className="reply-form" onSubmit={(event) => handleSubmitReply(comment.id, event)}>
+                        <label className="field">
+                          <span>Réponse</span>
+                          <textarea
+                            required
+                            value={replyValue}
+                            onChange={(event) =>
+                              setReplyContents((previous) => ({
+                                ...previous,
+                                [comment.id]: event.target.value,
+                              }))
+                            }
+                            placeholder="Ajoutez votre réponse"
+                          />
+                        </label>
+                        {replyError && <p className="feedback error">{replyError}</p>}
+                        <button className="submit-button" type="submit" disabled={isReplySubmitting}>
+                          {isReplySubmitting ? "Publication en cours…" : "Publier"}
+                        </button>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
