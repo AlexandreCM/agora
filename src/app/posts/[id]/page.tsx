@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PostDetails } from "@/components/post-details";
+import { getCurrentUser } from "@/lib/auth";
 import { readPostById } from "@/lib/posts";
 
 interface PostPageProps {
@@ -12,7 +13,8 @@ interface PostPageProps {
 export const dynamic = "force-dynamic";
 
 export default async function PostPage({ params }: PostPageProps) {
-  const post = await readPostById(params.id);
+  const user = await getCurrentUser();
+  const post = await readPostById(params.id, user?.id);
 
   if (!post) {
     notFound();

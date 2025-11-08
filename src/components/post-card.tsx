@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import type { Post } from "@/types/post";
+import { useSession } from "@/components/session-provider";
 
 interface PostCardProps {
   post: Post;
@@ -16,6 +17,8 @@ export function PostCard({ post }: PostCardProps) {
   const [likes, setLikes] = useState(post.likes);
   const [isLiking, setIsLiking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLiked, setHasLiked] = useState(Boolean(post.viewerHasLiked));
+  const { user } = useSession();
 
   function handleNavigate() {
     router.push(`/posts/${post.id}`);
@@ -35,7 +38,13 @@ export function PostCard({ post }: PostCardProps) {
   async function handleLike(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
 
-    if (isLiking) return;
+    if (!user) {
+      setError("Connectez-vous pour aimer les rapports.");
+      router.push("/login");
+      return;
+    }
+
+    if (isLiking || hasLiked) return;
 
     setIsLiking(true);
     setError(null);
@@ -49,6 +58,7 @@ export function PostCard({ post }: PostCardProps) {
 
       const updatedPost = (await response.json()) as Post;
       setLikes(updatedPost.likes);
+      setHasLiked(Boolean(updatedPost.viewerHasLiked ?? true));
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
     } finally {
@@ -103,8 +113,8 @@ export function PostCard({ post }: PostCardProps) {
           className="interaction-button"
           type="button"
           onClick={handleLike}
-          disabled={isLiking}
-          aria-label="J'aime ce rapport"
+          disabled={isLiking || hasLiked}
+          aria-label={hasLiked ? "Vous avez déjà aimé ce rapport" : "J'aime ce rapport"}
         >
           ❤️ {likes}
         </button>

@@ -12,6 +12,7 @@ export interface Comment {
   id: string;
   section: CommentSection;
   author: string;
+  authorId?: string;
   content: string;
   createdAt: string;
 }
@@ -25,4 +26,5 @@ export interface Post {
   createdAt: string;
   likes: number;
   comments: Comment[];
+  viewerHasLiked?: boolean;
 }

@@ -33,6 +33,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1.5rem;
   padding: 1rem 0;
 }
 
@@ -56,6 +57,40 @@ body {
 
 .nav-links a:hover {
   color: #1d4ed8;
+}
+
+.auth-links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.auth-links a {
+  text-decoration: none;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.auth-links a:hover {
+  text-decoration: underline;
+}
+
+.auth-links .primary-link {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.auth-links .primary-link:hover {
+  text-decoration: none;
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.25);
+}
+
+.welcome {
+  font-weight: 500;
+  color: #334155;
 }
 
 .main-content {
@@ -315,6 +350,10 @@ body {
   color: #16a34a;
 }
 
+.feedback.info {
+  color: #2563eb;
+}
+
 .rss-feed-list {
   margin-top: 2rem;
   background: white;
@@ -439,6 +478,12 @@ body {
   gap: 1rem;
 }
 
+.current-user {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
 .comment-section h3,
 .comment-discussions h3 {
   margin: 0;
@@ -561,6 +606,11 @@ body {
   }
 
   .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .auth-links {
     flex-wrap: wrap;
     justify-content: center;
   }
