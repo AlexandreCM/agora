@@ -121,6 +121,30 @@ body {
   gap: 1rem;
 }
 
+.interaction-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  background: rgba(244, 63, 94, 0.12);
+  color: #be123c;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.interaction-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.interaction-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(190, 18, 60, 0.15);
+}
+
 .source-link {
   color: #1d4ed8;
   text-decoration: none;
@@ -179,6 +203,15 @@ body {
   font: inherit;
 }
 
+.comment-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5f5;
+  background: white;
+  font: inherit;
+}
+
 .field textarea {
   min-height: 140px;
   resize: vertical;
@@ -210,6 +243,98 @@ body {
 
 .feedback.success {
   color: #16a34a;
+}
+
+.comment-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 1rem;
+}
+
+.comment-section h3,
+.comment-list h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.comment-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.comment-feedback {
+  min-height: 1.25rem;
+}
+
+.comment-list {
+  margin-top: 2rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.comment-group {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.comment-group h4 {
+  margin: 0;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.comment-count {
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.comment-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.comment-item {
+  background: white;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.comment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.comment-meta strong {
+  color: #1f2937;
+}
+
+.comment-item p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.empty-comments {
+  margin: 0;
+  color: #94a3b8;
+  font-style: italic;
 }
 
 @media (max-width: 640px) {

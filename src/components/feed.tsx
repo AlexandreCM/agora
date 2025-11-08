@@ -1,6 +1,5 @@
 import { readPosts } from "@/lib/posts";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { PostCard } from "@/components/post-card";
 
 export async function Feed() {
   const posts = await readPosts();
@@ -20,37 +19,7 @@ export async function Feed() {
   return (
     <div className="feed">
       {posts.map((post) => (
-        <article className="post-card" key={post.id}>
-          <div className="post-header">
-            <h2 className="post-title">{post.title}</h2>
-            <div className="post-meta">
-              <time dateTime={post.createdAt}>
-                Publié le {format(new Date(post.createdAt), "d MMMM yyyy", { locale: fr })}
-              </time>
-              <span>par Agora</span>
-            </div>
-          </div>
-          <p>{post.summary}</p>
-          {post.tags.length > 0 && (
-            <ul className="tag-list">
-              {post.tags.map((tag) => (
-                <li className="tag" key={tag}>
-                  {tag}
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="post-actions">
-            <a
-              className="source-link"
-              href={post.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Consulter la source ↗
-            </a>
-          </div>
-        </article>
+        <PostCard key={post.id} post={post} />
       ))}
     </div>
   );
