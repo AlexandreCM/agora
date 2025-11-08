@@ -5,11 +5,15 @@ Ce dépôt contient une première implémentation de l'application Agora avec Ne
 ## Démarrage
 
 ```bash
+export MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>/"
+# Optionnel : nom de base personnalisé (par défaut : "agora")
+# export MONGODB_DB="agora"
+
 npm install
 npm run dev
 ```
 
-L'application est ensuite disponible sur http://localhost:3000.
+L'application est ensuite disponible sur http://localhost:3000. Une base de données MongoDB accessible via `MONGODB_URI` est requise.
 
 ## Création d'un post
 
@@ -22,7 +26,7 @@ L'application est ensuite disponible sur http://localhost:3000.
    Si aucune valeur n'est fournie, le jeton par défaut est `changeme`.
 
 2. Rendez-vous sur http://localhost:3000/admin et remplissez le formulaire (titre, résumé, lien vers la source, tags facultatifs et jeton administrateur).
-3. Après soumission, le post est stocké dans `data/posts.json` et apparaît instantanément dans le fil d'actualité public.
+3. Après soumission, le post est enregistré dans la collection `posts` de la base MongoDB et apparaît instantanément dans le fil d'actualité public.
 
 ## Interactions côté utilisateur
 
@@ -34,7 +38,7 @@ Sur la page d'accueil :
 
 ## Structure des données
 
-Les posts sont enregistrés dans `data/posts.json` avec la structure suivante :
+Les posts sont enregistrés dans la collection `posts` avec la structure suivante :
 
 ```json
 {

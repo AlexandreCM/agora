@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { readPosts, writePosts } from "@/lib/posts";
+import { addCommentToPost } from "@/lib/posts";
 import { COMMENT_SECTIONS, type Comment, type CommentSection, type Post } from "@/types/post";
 
 export const dynamic = "force-dynamic";
@@ -38,13 +38,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Le commentaire est obligatoire." }, { status: 400 });
   }
 
-  const posts = await readPosts();
-  const postIndex = posts.findIndex((post) => post.id === id);
-
-  if (postIndex === -1) {
-    return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });
-  }
-
   const normalisedSection = normaliseSection(section);
   const normalisedAuthor = typeof author === "string" && author.trim().length > 0 ? author.trim() : "Anonyme";
 
@@ -56,14 +49,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     createdAt: new Date().toISOString(),
   };
 
-  const updatedPost: Post = {
-    ...posts[postIndex],
-    comments: [...posts[postIndex].comments, newComment],
-  };
+  const updatedPost: Post | null = await addCommentToPost(id, newComment);
 
-  const updatedPosts = [...posts];
-  updatedPosts[postIndex] = updatedPost;
-  await writePosts(updatedPosts);
+  if (!updatedPost) {
+    return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });
+  }
 
   return NextResponse.json(updatedPost);
 }
