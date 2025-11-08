@@ -95,6 +95,24 @@ export async function createPost(post: Post): Promise<Post> {
   return ensuredPost;
 }
 
+export async function findPostBySourceUrl(sourceUrl: string): Promise<Post | null> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+
+  const document = await collection.findOne({ sourceUrl });
+
+  return document ? ensurePostShape(document) : null;
+}
+
+export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+
+  const count = await collection.countDocuments({ sourceUrl }, { limit: 1 });
+
+  return count > 0;
+}
+
 export async function incrementPostLikes(id: string): Promise<Post | null> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);

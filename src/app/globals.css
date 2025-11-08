@@ -201,6 +201,14 @@ body {
   border-radius: 8px;
   border: 1px solid #cbd5f5;
   font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  outline: none;
 }
 
 .comment-form select {
@@ -217,6 +225,22 @@ body {
   resize: vertical;
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.checkbox-field label {
+  margin: 0;
+  flex: 1;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: auto;
+  accent-color: #2563eb;
+}
+
 .submit-button {
   background: linear-gradient(135deg, #2563eb, #7c3aed);
   color: white;
@@ -226,6 +250,34 @@ body {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.submit-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.25);
+}
+
+.secondary-button {
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1f2937;
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.secondary-button:hover {
+  background: #e2e8f0;
+}
+
+.actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
 }
 
 .submit-button:disabled {
@@ -243,6 +295,121 @@ body {
 
 .feedback.success {
   color: #16a34a;
+}
+
+.rss-feed-list {
+  margin-top: 2rem;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.rss-feed-list h3 {
+  margin: 0 0 1rem;
+}
+
+.rss-feed-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.rss-feed-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.rss-feed-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rss-feed-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.rss-feed-url {
+  display: inline-block;
+  color: #2563eb;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.rss-feed-url:hover {
+  text-decoration: underline;
+}
+
+.rss-feed-tags,
+.rss-feed-status,
+.rss-feed-last {
+  margin: 0.25rem 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.rss-feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.rss-feed-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #e2e8f0;
+  color: #1f2937;
+  transition: background 0.15s ease;
+}
+
+.rss-feed-actions button:hover {
+  background: #cbd5f5;
+}
+
+.rss-feed-actions .danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #b91c1c;
+}
+
+.rss-feed-actions .danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge.active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.badge.inactive {
+  background: rgba(148, 163, 184, 0.15);
+  color: #475569;
+}
+
+.empty-rss {
+  margin: 0;
+  color: #64748b;
 }
 
 .comment-section {
