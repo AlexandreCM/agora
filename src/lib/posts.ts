@@ -38,9 +38,12 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
     : new Date().toISOString();
 
   const likedBy = normaliseLikedBy(rawPost.likedBy);
-  const baseLikes =
-    typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes) ? rawPost.likes : 0;
-  const likes = baseLikes + likedBy.length;
+  const likes =
+    likedBy.length > 0
+      ? likedBy.length
+      : typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes)
+        ? rawPost.likes
+        : 0;
 
   return {
     id,
@@ -176,33 +179,50 @@ export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean>
   return count > 0;
 }
 
-export async function likePostByUser(
+export async function togglePostLikeByUser(
   id: string,
   userId: string,
-): Promise<{ post: Post | null; alreadyLiked: boolean }> {
+): Promise<{ post: Post | null; viewerHasLiked: boolean }> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
   const filter = buildPostFilter(id);
 
-  const updateResult = await collection.updateOne(filter, {
-    $addToSet: { likedBy: userId },
-  });
+  const existingDocument = await collection.findOne(filter);
+
+  if (!existingDocument) {
+    return { post: null, viewerHasLiked: false };
+  }
+
+  const likedBy = normaliseLikedBy(existingDocument.likedBy);
+  const alreadyLiked = likedBy.includes(userId);
+
+  const removalTargets: (string | ObjectId)[] = [userId];
+
+  if (ObjectId.isValid(userId)) {
+    removalTargets.push(new ObjectId(userId));
+  }
+
+  const update = alreadyLiked
+    ? { $pull: { likedBy: { $in: removalTargets } } }
+    : { $addToSet: { likedBy: userId } };
+
+  const updateResult = await collection.updateOne(filter, update);
 
   if (!updateResult.matchedCount) {
-    return { post: null, alreadyLiked: false };
+    return { post: null, viewerHasLiked: alreadyLiked };
   }
 
   const updatedDocument = await collection.findOne(filter);
 
   if (!updatedDocument) {
-    return { post: null, alreadyLiked: false };
+    return { post: null, viewerHasLiked: alreadyLiked };
   }
 
   const normalised = ensurePostShape(updatedDocument);
 
   return {
     post: toPostForViewer(normalised, userId),
-    alreadyLiked: updateResult.modifiedCount === 0,
+    viewerHasLiked: !alreadyLiked,
   };
 }
 
