@@ -75,6 +75,24 @@ body {
   border: 1px solid rgba(15, 23, 42, 0.05);
 }
 
+.post-card--clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.post-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12);
+}
+
+.post-card--clickable:focus,
+.post-card--clickable:focus-visible {
+  outline: none;
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.08),
+    0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
 .post-header {
   display: flex;
   flex-direction: column;
@@ -412,6 +430,7 @@ body {
   color: #64748b;
 }
 
+
 .comment-section {
   margin-top: 2rem;
   padding-top: 1.5rem;
@@ -421,7 +440,7 @@ body {
 }
 
 .comment-section h3,
-.comment-list h3 {
+.comment-discussions h3 {
   margin: 0;
   font-size: 1.1rem;
 }
@@ -436,35 +455,66 @@ body {
   min-height: 1.25rem;
 }
 
-.comment-list {
+.comment-discussions {
   margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
-.comment-group {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  display: grid;
+.comment-tabs {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
-.comment-group h4 {
-  margin: 0;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.comment-tab {
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1f2937;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.comment-count {
+.comment-tab--active {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.25);
+}
+
+.comment-tab:focus,
+.comment-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.comment-tab .comment-count {
+  margin-left: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.comment-tab:not(.comment-tab--active) .comment-count {
   color: #475569;
-  font-size: 0.9rem;
 }
 
-.comment-group ul {
+.comment-tab--active .comment-count {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.comment-panel {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.comment-items {
   list-style: none;
   padding: 0;
   margin: 0;

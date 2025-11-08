@@ -3,6 +3,7 @@ export const COMMENT_SECTIONS = [
   "debate",
   "question",
   "proposal",
+  "avis",
 ] as const;
 
 export type CommentSection = (typeof COMMENT_SECTIONS)[number];

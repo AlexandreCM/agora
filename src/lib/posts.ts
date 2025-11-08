@@ -80,6 +80,16 @@ export async function readPosts(): Promise<Post[]> {
   );
 }
 
+export async function readPostById(id: string): Promise<Post | null> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const filter = buildPostFilter(id);
+
+  const document = await collection.findOne(filter);
+
+  return document ? ensurePostShape(document) : null;
+}
+
 export async function createPost(post: Post): Promise<Post> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
