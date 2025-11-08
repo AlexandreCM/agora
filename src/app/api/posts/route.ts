@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
     sourceUrl: sourceUrl.trim(),
     tags: normalisedTags,
     createdAt: new Date().toISOString(),
+    likes: 0,
+    comments: [],
   };
 
   const posts = await readPosts();

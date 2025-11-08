@@ -1,0 +1,229 @@
+"use client";
+
+import { useMemo, useState, type FormEvent } from "react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { COMMENT_SECTIONS, type Comment, type CommentSection, type Post } from "@/types/post";
+
+const SECTION_LABELS: Record<CommentSection, string> = {
+  analysis: "Analyse",
+  debate: "Débat",
+  question: "Question",
+  proposal: "Proposition",
+};
+
+interface PostCardProps {
+  post: Post;
+}
+
+type CommentGroups = Record<CommentSection, Comment[]>;
+
+function groupComments(comments: Comment[]): CommentGroups {
+  return comments.reduce<CommentGroups>((accumulator, comment) => {
+    return {
+      ...accumulator,
+      [comment.section]: [...accumulator[comment.section], comment],
+    };
+  },
+  COMMENT_SECTIONS.reduce<CommentGroups>((initial, section) => {
+    return { ...initial, [section]: [] };
+  }, {} as CommentGroups));
+}
+
+export function PostCard({ post }: PostCardProps) {
+  const [likes, setLikes] = useState(post.likes);
+  const [isLiking, setIsLiking] = useState(false);
+  const [comments, setComments] = useState<Comment[]>(post.comments);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSection, setSelectedSection] = useState<CommentSection>("analysis");
+  const [author, setAuthor] = useState("");
+  const [content, setContent] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  const commentsBySection = useMemo(() => groupComments(comments), [comments]);
+
+  async function handleLike() {
+    if (isLiking) return;
+
+    setIsLiking(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/like`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Impossible d'enregistrer votre appréciation.");
+      }
+
+      const updatedPost = (await response.json()) as Post;
+      setLikes(updatedPost.likes);
+    } catch (likeError) {
+      setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
+    } finally {
+      setIsLiking(false);
+    }
+  }
+
+  async function handleSubmitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
+    setFeedback(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          section: selectedSection,
+          author,
+          content,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? "Impossible d'envoyer votre commentaire.");
+      }
+
+      const updatedPost = (await response.json()) as Post;
+      setComments(updatedPost.comments);
+      setContent("");
+      setAuthor("");
+      setFeedback("Votre contribution a bien été publiée.");
+    } catch (commentError) {
+      setError(commentError instanceof Error ? commentError.message : "Une erreur est survenue.");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  }
+
+  return (
+    <article className="post-card" key={post.id}>
+      <div className="post-header">
+        <h2 className="post-title">{post.title}</h2>
+        <div className="post-meta">
+          <time dateTime={post.createdAt}>
+            Publié le {format(new Date(post.createdAt), "d MMMM yyyy", { locale: fr })}
+          </time>
+          <span>par Agora</span>
+        </div>
+      </div>
+      <p>{post.summary}</p>
+      {post.tags.length > 0 && (
+        <ul className="tag-list">
+          {post.tags.map((tag) => (
+            <li className="tag" key={tag}>
+              {tag}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="post-actions">
+        <a className="source-link" href={post.sourceUrl} target="_blank" rel="noreferrer">
+          Consulter la source ↗
+        </a>
+        <button
+          className="interaction-button"
+          type="button"
+          onClick={handleLike}
+          disabled={isLiking}
+          aria-label="J'aime ce rapport"
+        >
+          ❤️ {likes}
+        </button>
+      </div>
+
+      <section className="comment-section">
+        <h3>Contribuer</h3>
+        <form className="comment-form" onSubmit={handleSubmitComment}>
+          <div className="comment-grid">
+            <label className="field">
+              <span>Type de contribution</span>
+              <select
+                value={selectedSection}
+                onChange={(event) => setSelectedSection(event.target.value as CommentSection)}
+              >
+                {COMMENT_SECTIONS.map((section) => (
+                  <option key={section} value={section}>
+                    {SECTION_LABELS[section]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Nom (optionnel)</span>
+              <input
+                type="text"
+                value={author}
+                onChange={(event) => setAuthor(event.target.value)}
+                placeholder="Votre nom ou pseudonyme"
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span>Commentaire</span>
+            <textarea
+              required
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="Partagez votre analyse, question ou proposition"
+            />
+          </label>
+          <div className="comment-feedback">
+            {feedback && <p className="feedback success">{feedback}</p>}
+            {error && <p className="feedback error">{error}</p>}
+          </div>
+          <button className="submit-button" type="submit" disabled={isSubmittingComment}>
+            {isSubmittingComment ? "Publication en cours…" : "Publier"}
+          </button>
+        </form>
+      </section>
+
+      <section className="comment-list">
+        <h3>Discussions</h3>
+        {COMMENT_SECTIONS.map((section) => {
+          const sectionComments = commentsBySection[section];
+
+          if (sectionComments.length === 0) {
+            return (
+              <div className="comment-group" key={section}>
+                <h4>{SECTION_LABELS[section]}</h4>
+                <p className="empty-comments">Aucune contribution pour le moment.</p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="comment-group" key={section}>
+              <h4>
+                {SECTION_LABELS[section]} <span className="comment-count">({sectionComments.length})</span>
+              </h4>
+              <ul>
+                {sectionComments.map((comment) => (
+                  <li key={comment.id} className="comment-item">
+                    <div className="comment-meta">
+                      <strong>{comment.author}</strong>
+                      <time dateTime={comment.createdAt}>
+                        {format(new Date(comment.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
+                      </time>
+                    </div>
+                    <p>{comment.content}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </section>
+    </article>
+  );
+}
