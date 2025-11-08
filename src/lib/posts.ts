@@ -1,8 +1,10 @@
+import { ObjectId, type Filter } from "mongodb";
+
 import { getDb } from "@/lib/mongodb";
 import { COMMENT_SECTIONS } from "@/types/post";
 import type { Comment, CommentSection, Post } from "@/types/post";
 
-type MongoPostDocument = Post & { _id?: string };
+type MongoPostDocument = Post & { _id?: string | ObjectId };
 
 const POSTS_COLLECTION = "posts";
 
@@ -11,7 +13,12 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): Post {
     ? rawPost.comments.map((comment) => ensureCommentShape(comment))
     : [];
 
-  const id = String(rawPost.id ?? rawPost._id ?? "");
+  const idSource = rawPost.id ?? rawPost._id ?? "";
+  const id = idSource instanceof ObjectId ? idSource.toHexString() : String(idSource);
+  const parsedCreatedAt = rawPost.createdAt ? new Date(rawPost.createdAt) : null;
+  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+    ? parsedCreatedAt.toISOString()
+    : new Date().toISOString();
 
   return {
     id,
@@ -19,7 +26,7 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): Post {
     summary: String(rawPost.summary ?? ""),
     sourceUrl: String(rawPost.sourceUrl ?? ""),
     tags: Array.isArray(rawPost.tags) ? rawPost.tags.map((tag) => String(tag)) : [],
-    createdAt: rawPost.createdAt ?? new Date().toISOString(),
+    createdAt,
     likes:
       typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes)
         ? rawPost.likes
@@ -34,13 +41,28 @@ function ensureCommentShape(rawComment: Partial<Comment>): Comment {
     ? ((rawComment.section as CommentSection) ?? defaultSection)
     : defaultSection;
 
+  const parsedCreatedAt = rawComment.createdAt ? new Date(rawComment.createdAt) : null;
+  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+    ? parsedCreatedAt.toISOString()
+    : new Date().toISOString();
+
   return {
     id: String(rawComment.id ?? ""),
     section,
     author: rawComment.author ? String(rawComment.author) : "Anonyme",
     content: String(rawComment.content ?? ""),
-    createdAt: rawComment.createdAt ?? new Date().toISOString(),
+    createdAt,
   };
+}
+
+function buildPostFilter(id: string): Filter<MongoPostDocument> {
+  const filters: Record<string, unknown>[] = [{ id }, { _id: id }];
+
+  if (ObjectId.isValid(id)) {
+    filters.push({ _id: new ObjectId(id) });
+  }
+
+  return { $or: filters } as Filter<MongoPostDocument>;
 }
 
 export async function readPosts(): Promise<Post[]> {
@@ -76,14 +98,18 @@ export async function createPost(post: Post): Promise<Post> {
 export async function incrementPostLikes(id: string): Promise<Post | null> {
   const db = await getDb();
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const filter = buildPostFilter(id);
 
-  const result = await collection.findOneAndUpdate(
-    { $or: [{ _id: id }, { id }] },
-    { $inc: { likes: 1 } },
-    { returnDocument: "after" },
-  );
+  const updateResult = await collection.updateOne(filter, { $inc: { likes: 1 } });
 
-  return result.value ? ensurePostShape(result.value) : null;
+  if (!updateResult.matchedCount) {
+    return null;
+  }
+
+  const updatedDocument = await collection.findOne(filter);
+
+  return updatedDocument ? ensurePostShape(updatedDocument) : null;
+
 }
 
 export async function addCommentToPost(id: string, comment: Comment): Promise<Post | null> {
@@ -91,12 +117,15 @@ export async function addCommentToPost(id: string, comment: Comment): Promise<Po
   const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
   const ensuredComment = ensureCommentShape(comment);
+  const filter = buildPostFilter(id);
 
-  const result = await collection.findOneAndUpdate(
-    { $or: [{ _id: id }, { id }] },
-    { $push: { comments: ensuredComment } },
-    { returnDocument: "after" },
-  );
+  const updateResult = await collection.updateOne(filter, { $push: { comments: ensuredComment } });
 
-  return result.value ? ensurePostShape(result.value) : null;
+  if (!updateResult.matchedCount) {
+    return null;
+  }
+
+  const updatedDocument = await collection.findOne(filter);
+
+  return updatedDocument ? ensurePostShape(updatedDocument) : null;
 }
