@@ -119,7 +119,7 @@ export function summariseDescription(description: string, fallback: string): str
 
   const normalised = source.replace(/\s+/g, " ").trim();
 
-  return normalised.slice(0, 50);
+  return normalised.slice(0, 250) + (normalised.length > 250 ? "…" : "");
 }
 
 export type { ParsedRssItem };
