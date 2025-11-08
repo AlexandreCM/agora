@@ -8,6 +8,15 @@ export const COMMENT_SECTIONS = [
 
 export type CommentSection = (typeof COMMENT_SECTIONS)[number];
 
+export interface CommentReply {
+  id: string;
+  parentId: string;
+  author: string;
+  authorId?: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Comment {
   id: string;
   section: CommentSection;
@@ -15,6 +24,7 @@ export interface Comment {
   authorId?: string;
   content: string;
   createdAt: string;
+  replies: CommentReply[];
 }
 
 export interface Post {

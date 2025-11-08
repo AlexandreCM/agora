@@ -2,7 +2,7 @@ import { ObjectId, type Filter } from "mongodb";
 
 import { getDb } from "@/lib/mongodb";
 import { COMMENT_SECTIONS } from "@/types/post";
-import type { Comment, CommentSection, Post } from "@/types/post";
+import type { Comment, CommentReply, CommentSection, Post } from "@/types/post";
 
 type MongoPostDocument = Omit<Post, "viewerHasLiked"> & {
   _id?: string | ObjectId;
@@ -58,6 +58,28 @@ function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
   };
 }
 
+function ensureReplyShape(
+  rawReply: Partial<CommentReply>,
+  fallbackParentId: string,
+): CommentReply {
+  const parsedCreatedAt = rawReply.createdAt ? new Date(rawReply.createdAt) : null;
+  const createdAt =
+    parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+      ? parsedCreatedAt.toISOString()
+      : new Date().toISOString();
+
+  const parentId = rawReply.parentId ?? fallbackParentId;
+
+  return {
+    id: String(rawReply.id ?? ""),
+    parentId: String(parentId ?? fallbackParentId),
+    author: rawReply.author ? String(rawReply.author) : "Anonyme",
+    authorId: rawReply.authorId ? String(rawReply.authorId) : undefined,
+    content: String(rawReply.content ?? ""),
+    createdAt,
+  };
+}
+
 function ensureCommentShape(rawComment: Partial<Comment>): Comment {
   const defaultSection: CommentSection = "analysis";
   const section = COMMENT_SECTIONS.includes((rawComment.section as CommentSection) ?? defaultSection)
@@ -69,13 +91,23 @@ function ensureCommentShape(rawComment: Partial<Comment>): Comment {
     ? parsedCreatedAt.toISOString()
     : new Date().toISOString();
 
+  const commentId = String(rawComment.id ?? "");
+  const rawReplies =
+    rawComment && typeof rawComment === "object" && "replies" in rawComment
+      ? (rawComment as { replies?: CommentReply[] }).replies
+      : undefined;
+  const replies = Array.isArray(rawReplies)
+    ? rawReplies.map((reply) => ensureReplyShape(reply, commentId))
+    : [];
+
   return {
-    id: String(rawComment.id ?? ""),
+    id: commentId,
     section,
     author: rawComment.author ? String(rawComment.author) : "Anonyme",
     authorId: rawComment.authorId ? String(rawComment.authorId) : undefined,
     content: String(rawComment.content ?? ""),
     createdAt,
+    replies,
   };
 }
 
@@ -244,6 +276,37 @@ export async function addCommentToPost(
   }
 
   const updatedDocument = await collection.findOne(filter);
+
+  if (!updatedDocument) {
+    return null;
+  }
+
+  const normalised = ensurePostShape(updatedDocument);
+  return toPostForViewer(normalised, viewerId);
+}
+
+export async function addReplyToComment(
+  id: string,
+  parentId: string,
+  reply: CommentReply,
+  viewerId?: string,
+): Promise<Post | null> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+
+  const ensuredReply = ensureReplyShape(reply, parentId);
+  ensuredReply.parentId = parentId;
+
+  const filter = { ...buildPostFilter(id), "comments.id": parentId } as Filter<MongoPostDocument>;
+  const updateResult = await collection.updateOne(filter, {
+    $push: { "comments.$.replies": ensuredReply },
+  });
+
+  if (!updateResult.matchedCount) {
+    return null;
+  }
+
+  const updatedDocument = await collection.findOne(buildPostFilter(id));
 
   if (!updatedDocument) {
     return null;
