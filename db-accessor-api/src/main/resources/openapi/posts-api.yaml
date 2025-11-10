@@ -1,0 +1,139 @@
+openapi: 3.0.3
+info:
+  title: API d'accès aux postes
+  version: 1.0.0
+  description: API permettant de créer et de consulter des postes dans MongoDB.
+servers:
+  - url: http://localhost:8080
+paths:
+  /posts:
+    get:
+      operationId: listPosts
+      tags:
+        - Posts
+      summary: Récupère la liste des postes.
+      responses:
+        '200':
+          description: Liste des postes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+    post:
+      operationId: createPost
+      tags:
+        - Posts
+      summary: Crée un nouveau poste.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Poste créé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Requête invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/{postId}:
+    get:
+      operationId: getPost
+      tags:
+        - Posts
+      summary: Récupère un poste via son identifiant.
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema:
+            type: string
+          description: Identifiant du poste recherché.
+      responses:
+        '200':
+          description: Poste trouvé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Poste introuvable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Post:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - author
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          description: Identifiant unique du poste.
+        title:
+          type: string
+          description: Titre du poste.
+          minLength: 1
+        content:
+          type: string
+          description: Contenu du poste.
+          minLength: 1
+        author:
+          type: string
+          description: Auteur du poste.
+          minLength: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: Date de création du poste.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Date de dernière modification du poste.
+    CreatePostRequest:
+      type: object
+      required:
+        - title
+        - content
+        - author
+      properties:
+        title:
+          type: string
+          description: Titre du poste.
+          minLength: 1
+        content:
+          type: string
+          description: Contenu du poste.
+          minLength: 1
+        author:
+          type: string
+          description: Auteur du poste.
+          minLength: 1
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Code de l'erreur.
+        message:
+          type: string
+          description: Description de l'erreur.
