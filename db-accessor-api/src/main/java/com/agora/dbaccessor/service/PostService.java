@@ -19,5 +19,5 @@ public interface PostService {
 
     Post togglePostLike(String id, TogglePostLikeRequest request);
 
-    Post addComment(String id, CreatePostCommentRequest request, String viewerId);
+    Post addComment(String id, CreatePostCommentRequest request);
 }

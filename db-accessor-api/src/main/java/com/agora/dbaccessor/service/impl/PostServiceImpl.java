@@ -141,7 +141,7 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public Post addComment(String id, CreatePostCommentRequest request, String viewerId) {
+    public Post addComment(String id, CreatePostCommentRequest request) {
         PostDocument document = findPostDocument(id);
 
         if (request.getReply() != null) {

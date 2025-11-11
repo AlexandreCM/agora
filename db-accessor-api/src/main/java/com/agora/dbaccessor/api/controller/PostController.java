@@ -70,9 +70,8 @@ public class PostController {
     @PostMapping("/{postId}/comments")
     public ResponseEntity<Post> addComment(
             @PathVariable String postId,
-            @Valid @RequestBody CreatePostCommentRequest request,
-            @RequestParam(name = "viewerId", required = false) String viewerId) {
-        Post updated = postService.addComment(postId, request, viewerId);
+            @Valid @RequestBody CreatePostCommentRequest request) {
+        Post updated = postService.addComment(postId, request);
         return ResponseEntity.ok(updated);
     }
 }

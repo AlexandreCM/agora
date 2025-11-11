@@ -12,13 +12,6 @@ paths:
       tags:
         - Posts
       summary: Retrieves the list of posts.
-      parameters:
-        - in: query
-          name: viewerId
-          schema:
-            type: string
-          required: false
-          description: Identifier of the viewer requesting the posts.
       responses:
         '200':
           description: List of posts.
@@ -65,12 +58,6 @@ paths:
           schema:
             type: string
           description: Identifier of the requested post.
-        - in: query
-          name: viewerId
-          required: false
-          schema:
-            type: string
-          description: Identifier of the viewer requesting the post.
       responses:
         '200':
           description: Post found.
@@ -129,12 +116,6 @@ paths:
           schema:
             type: string
           description: Identifier of the post receiving the comment.
-        - in: query
-          name: viewerId
-          required: false
-          schema:
-            type: string
-          description: Identifier of the viewer requesting the updated post.
       requestBody:
         required: true
         content:
@@ -174,12 +155,6 @@ paths:
             type: string
             format: uri
           description: Original source URL of the post.
-        - in: query
-          name: viewerId
-          required: false
-          schema:
-            type: string
-          description: Identifier of the viewer requesting the post.
       responses:
         '200':
           description: Post found.
@@ -193,27 +168,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /posts/source/exists:
-    get:
-      operationId: postExistsBySourceUrl
-      tags:
-        - Posts
-      summary: Checks if a post exists for a given source URL.
-      parameters:
-        - in: query
-          name: sourceUrl
-          required: true
-          schema:
-            type: string
-            format: uri
-          description: Source URL to check.
-      responses:
-        '200':
-          description: Post existence status.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostExistenceResponse'
   /users:
     post:
       operationId: createUser
@@ -550,14 +504,6 @@ components:
         reply:
           $ref: '#/components/schemas/PostCommentReply'
       description: Request payload to create a comment or a reply. Provide either a comment or a reply.
-    PostExistenceResponse:
-      type: object
-      required:
-        - exists
-      properties:
-        exists:
-          type: boolean
-          description: Indicates whether a post exists for the given source URL.
 
     ErrorResponse:
       type: object
