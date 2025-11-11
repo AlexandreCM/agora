@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 @Document(collection = "posts")
 public record PostDocument(
@@ -28,7 +29,7 @@ public record PostDocument(
     public record PostCommentDocument(
             String id,
             String section,
-            String authorName,
+            @Field("authorName") String author,
             String authorId,
             String content,
             OffsetDateTime createdAt,
@@ -42,7 +43,7 @@ public record PostDocument(
     public record PostCommentReplyDocument(
             String id,
             String parentId,
-            String authorName,
+            @Field("authorName") String author,
             String authorId,
             String content,
             OffsetDateTime createdAt) {

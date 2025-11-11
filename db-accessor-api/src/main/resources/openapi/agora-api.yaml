@@ -1,12 +1,10 @@
 openapi: 3.0.3
 info:
   title: Agora Database Access API
-  version: 1.0.0
+  version: 1.1.0
   description: This API provides access to the Agora database.
-
 servers:
   - url: http://localhost:8080
-
 paths:
   /posts:
     get:
@@ -14,6 +12,13 @@ paths:
       tags:
         - Posts
       summary: Retrieves the list of posts.
+      parameters:
+        - in: query
+          name: viewerId
+          schema:
+            type: string
+          required: false
+          description: Identifier of the viewer requesting the posts.
       responses:
         '200':
           description: List of posts.
@@ -60,6 +65,12 @@ paths:
           schema:
             type: string
           description: Identifier of the requested post.
+        - in: query
+          name: viewerId
+          required: false
+          schema:
+            type: string
+          description: Identifier of the viewer requesting the post.
       responses:
         '200':
           description: Post found.
@@ -73,7 +84,301 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+  /posts/{postId}/like:
+    post:
+      operationId: togglePostLike
+      tags:
+        - Posts
+      summary: Toggles the like of a post for a user.
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the post to like or unlike.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TogglePostLikeRequest'
+      responses:
+        '200':
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Post not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/{postId}/comments:
+    post:
+      operationId: addPostComment
+      tags:
+        - Posts
+      summary: Adds a comment or reply to a post.
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the post receiving the comment.
+        - in: query
+          name: viewerId
+          required: false
+          schema:
+            type: string
+          description: Identifier of the viewer requesting the updated post.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostCommentRequest'
+      responses:
+        '200':
+          description: Updated post including the new comment or reply.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post or comment not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/source:
+    get:
+      operationId: findPostBySourceUrl
+      tags:
+        - Posts
+      summary: Retrieves a post by its source URL.
+      parameters:
+        - in: query
+          name: sourceUrl
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Original source URL of the post.
+        - in: query
+          name: viewerId
+          required: false
+          schema:
+            type: string
+          description: Identifier of the viewer requesting the post.
+      responses:
+        '200':
+          description: Post found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          description: Post not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/source/exists:
+    get:
+      operationId: postExistsBySourceUrl
+      tags:
+        - Posts
+      summary: Checks if a post exists for a given source URL.
+      parameters:
+        - in: query
+          name: sourceUrl
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Source URL to check.
+      responses:
+        '200':
+          description: Post existence status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostExistenceResponse'
+  /users:
+    post:
+      operationId: createUser
+      tags:
+        - Users
+      summary: Creates a new user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      operationId: getUserByEmail
+      tags:
+        - Users
+      summary: Retrieves a user by email address.
+      parameters:
+        - in: query
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+          description: Email of the user to retrieve.
+      responses:
+        '200':
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithPassword'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/{userId}:
+    get:
+      operationId: getUser
+      tags:
+        - Users
+      summary: Retrieves a user by identifier.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the requested user.
+      responses:
+        '200':
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/{userId}/sessions:
+    delete:
+      operationId: deleteUserSessions
+      tags:
+        - Users
+      summary: Deletes every session associated with a user.
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the user whose sessions must be revoked.
+      responses:
+        '204':
+          description: Sessions deleted.
+  /sessions:
+    post:
+      operationId: createSession
+      tags:
+        - Sessions
+      summary: Stores a user session token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sessions/{tokenHash}:
+    delete:
+      operationId: deleteSession
+      tags:
+        - Sessions
+      summary: Deletes a session identified by its token hash.
+      parameters:
+        - in: path
+          name: tokenHash
+          required: true
+          schema:
+            type: string
+          description: Hash of the session token to delete.
+      responses:
+        '204':
+          description: Session deleted.
+  /sessions/validate:
+    post:
+      operationId: validateSession
+      tags:
+        - Sessions
+      summary: Validates a session token and returns the associated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateSessionRequest'
+      responses:
+        '200':
+          description: Session is valid and the associated user is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Session not found or expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Post:
@@ -112,11 +417,23 @@ components:
           type: string
           format: date-time
           description: Post creation date.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update date of the post.
+        likes:
+          type: integer
+          format: int32
+          description: Number of likes associated with the post.
         likedBy:
           type: array
           description: List of user identifiers who liked the post.
           items:
             type: string
+        viewerHasLiked:
+          type: boolean
+          nullable: true
+          description: Indicates whether the requesting viewer has liked the post.
         comments:
           type: array
           description: Comments associated with the post.
@@ -127,8 +444,7 @@ components:
       required:
         - id
         - section
-        - authorName
-        - authorId
+        - author
         - content
         - createdAt
         - replies
@@ -138,11 +454,12 @@ components:
           description: Comment identifier.
         section:
           $ref: '#/components/schemas/PostCommentSection'
-        authorName:
+        author:
           type: string
           description: Full name of the comment author.
         authorId:
           type: string
+          nullable: true
           description: Internal identifier of the comment author.
         content:
           type: string
@@ -161,8 +478,7 @@ components:
       required:
         - id
         - parentId
-        - authorName
-        - authorId
+        - author
         - content
         - createdAt
       properties:
@@ -172,11 +488,12 @@ components:
         parentId:
           type: string
           description: Identifier of the parent comment.
-        authorName:
+        author:
           type: string
           description: Full name of the reply author.
         authorId:
           type: string
+          nullable: true
           description: Internal identifier of the reply author.
         content:
           type: string
@@ -202,6 +519,9 @@ components:
         - sourceUrl
         - tags
       properties:
+        id:
+          type: string
+          description: Optional identifier supplied by the caller.
         title:
           type: string
           description: Post title.
@@ -219,6 +539,30 @@ components:
           description: List of tags associated with the post.
           items:
             type: string
+    TogglePostLikeRequest:
+      type: object
+      required:
+        - userId
+      properties:
+        userId:
+          type: string
+          description: Identifier of the user toggling the like.
+    CreatePostCommentRequest:
+      type: object
+      properties:
+        comment:
+          $ref: '#/components/schemas/PostComment'
+        reply:
+          $ref: '#/components/schemas/PostCommentReply'
+      description: Request payload to create a comment or a reply. Provide either a comment or a reply.
+    PostExistenceResponse:
+      type: object
+      required:
+        - exists
+      properties:
+        exists:
+          type: boolean
+          description: Indicates whether a post exists for the given source URL.
     ErrorResponse:
       type: object
       required:
@@ -231,3 +575,103 @@ components:
         message:
           type: string
           description: Error description.
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user.
+        name:
+          type: string
+          description: Display name of the user.
+        email:
+          type: string
+          format: email
+          description: Email address of the user.
+        createdAt:
+          type: string
+          format: date-time
+          description: User creation date.
+    UserWithPassword:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required:
+            - passwordHash
+          properties:
+            passwordHash:
+              type: string
+              description: Password hash associated with the user.
+    CreateUserRequest:
+      type: object
+      required:
+        - name
+        - email
+        - passwordHash
+      properties:
+        name:
+          type: string
+          description: Display name of the user.
+        email:
+          type: string
+          format: email
+          description: Email address of the user.
+        passwordHash:
+          type: string
+          description: Password hash to store.
+    Session:
+      type: object
+      required:
+        - id
+        - tokenHash
+        - userId
+        - createdAt
+        - expiresAt
+      properties:
+        id:
+          type: string
+          description: Identifier of the stored session.
+        tokenHash:
+          type: string
+          description: Hash of the session token.
+        userId:
+          type: string
+          description: Identifier of the associated user.
+        createdAt:
+          type: string
+          format: date-time
+          description: Session creation date.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Session expiration date.
+    CreateSessionRequest:
+      type: object
+      required:
+        - userId
+        - tokenHash
+        - expiresAt
+      properties:
+        userId:
+          type: string
+          description: Identifier of the user owning the session.
+        tokenHash:
+          type: string
+          description: Hash of the session token to store.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Expiration date of the session.
+    ValidateSessionRequest:
+      type: object
+      required:
+        - tokenHash
+      properties:
+        tokenHash:
+          type: string
+          description: Hash of the session token to validate.

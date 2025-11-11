@@ -2,8 +2,8 @@ import { randomBytes, scrypt as nodeScrypt, timingSafeEqual, createHash } from "
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
 
-import { getDb } from "@/lib/mongodb";
-import { getUserById, deleteUserSessions } from "@/lib/users";
+import { dbAccessorFetch } from "@/lib/db-accessor-client";
+import { deleteUserSessions } from "@/lib/users";
 import type { User } from "@/types/user";
 
 const scrypt = promisify(nodeScrypt);
@@ -11,12 +11,20 @@ const scrypt = promisify(nodeScrypt);
 const SESSION_COOKIE_NAME = "agora_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
-interface SessionDocument {
-  _id?: string;
+interface SessionCreationResult {
+  token: string;
   tokenHash: string;
-  userId: string;
-  createdAt: string;
-  expiresAt: string;
+  expiresAt: Date;
+}
+
+function expectJsonContent<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    throw new Error("Réponse inattendue du service db-accessor");
+  }
+
+  return response.json() as Promise<T>;
 }
 
 function encodePasswordHash(salt: Buffer, derivedKey: Buffer): string {
@@ -43,7 +51,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   return timingSafeEqual(storedKey, derivedKey);
 }
 
-function createSessionToken() {
+function createSessionToken(): SessionCreationResult {
   const token = randomBytes(48).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -52,28 +60,30 @@ function createSessionToken() {
 }
 
 export async function createUserSession(userId: string) {
-  const db = await getDb();
-  const collection = db.collection<SessionDocument>("sessions");
   const { token, tokenHash, expiresAt } = createSessionToken();
 
-  const session: SessionDocument = {
-    tokenHash,
-    userId,
-    createdAt: new Date().toISOString(),
-    expiresAt: expiresAt.toISOString(),
-  };
+  const response = await dbAccessorFetch("/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      userId,
+      tokenHash,
+      expiresAt: expiresAt.toISOString(),
+    }),
+  });
 
-  await collection.insertOne(session);
+  if (!response.ok) {
+    throw new Error("Impossible de créer la session utilisateur.");
+  }
 
   return { token, expiresAt };
 }
 
 export async function removeSessionByToken(token: string) {
-  const db = await getDb();
-  const collection = db.collection<SessionDocument>("sessions");
   const tokenHash = createHash("sha256").update(token).digest("hex");
 
-  await collection.deleteOne({ tokenHash });
+  await dbAccessorFetch(`/sessions/${tokenHash}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -83,34 +93,23 @@ export async function getCurrentUser(): Promise<User | null> {
     return null;
   }
 
-  const db = await getDb();
-  const collection = db.collection<SessionDocument>("sessions");
   const tokenHash = createHash("sha256").update(sessionCookie.value).digest("hex");
 
-  const session = await collection.findOne({ tokenHash });
+  const response = await dbAccessorFetch("/sessions/validate", {
+    method: "POST",
+    body: JSON.stringify({ tokenHash }),
+  });
 
-  if (!session) {
-    cookies().delete(SESSION_COOKIE_NAME);
+  if (response.status === 404) {
+    clearSessionCookie();
     return null;
   }
 
-  const isExpired = new Date(session.expiresAt).getTime() < Date.now();
-
-  if (isExpired) {
-    await collection.deleteOne({ tokenHash });
-    cookies().delete(SESSION_COOKIE_NAME);
-    return null;
+  if (!response.ok) {
+    throw new Error("Impossible de valider la session utilisateur.");
   }
 
-  const user = await getUserById(session.userId);
-
-  if (!user) {
-    await collection.deleteOne({ tokenHash });
-    cookies().delete(SESSION_COOKIE_NAME);
-    return null;
-  }
-
-  return user;
+  return expectJsonContent<User>(response);
 }
 
 export function setSessionCookie(token: string, expiresAt: Date) {

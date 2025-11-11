@@ -1,261 +1,122 @@
-import { ObjectId, type Filter } from "mongodb";
+import { dbAccessorFetch } from "@/lib/db-accessor-client";
+import type { Comment, CommentReply, Post } from "@/types/post";
 
-import { getDb } from "@/lib/mongodb";
-import { COMMENT_SECTIONS } from "@/types/post";
-import type { Comment, CommentReply, CommentSection, Post } from "@/types/post";
+function buildQuery(params: Record<string, string | undefined>) {
+  const entries = Object.entries(params).filter(([, value]) => typeof value === "string" && value.length > 0);
 
-type MongoPostDocument = Omit<Post, "viewerHasLiked"> & {
-  _id?: string | ObjectId;
-  likedBy?: (string | ObjectId)[];
-};
-
-interface NormalisedPost extends Omit<Post, "viewerHasLiked"> {
-  likedBy: string[];
-}
-
-const POSTS_COLLECTION = "posts";
-
-function normaliseLikedBy(rawLikedBy: MongoPostDocument["likedBy"]): string[] {
-  if (!Array.isArray(rawLikedBy)) {
-    return [];
+  if (!entries.length) {
+    return "";
   }
 
-  return rawLikedBy
-    .map((value) => (value instanceof ObjectId ? value.toHexString() : String(value)))
-    .filter((value) => Boolean(value));
-}
-
-function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
-  const comments = Array.isArray(rawPost.comments)
-    ? rawPost.comments.map((comment) => ensureCommentShape(comment))
-    : [];
-
-  const idSource = rawPost.id ?? rawPost._id ?? "";
-  const id = idSource instanceof ObjectId ? idSource.toHexString() : String(idSource);
-  const parsedCreatedAt = rawPost.createdAt ? new Date(rawPost.createdAt) : null;
-  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
-    ? parsedCreatedAt.toISOString()
-    : new Date().toISOString();
-
-  const likedBy = normaliseLikedBy(rawPost.likedBy);
-  const likes =
-    likedBy.length > 0
-      ? likedBy.length
-      : typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes)
-        ? rawPost.likes
-        : 0;
-
-  return {
-    id,
-    title: String(rawPost.title ?? ""),
-    summary: String(rawPost.summary ?? ""),
-    sourceUrl: String(rawPost.sourceUrl ?? ""),
-    tags: Array.isArray(rawPost.tags) ? rawPost.tags.map((tag) => String(tag)) : [],
-    createdAt,
-    likes,
-    comments,
-    likedBy,
-  };
-}
-
-function ensureReplyShape(
-  rawReply: Partial<CommentReply>,
-  fallbackParentId: string,
-): CommentReply {
-  const parsedCreatedAt = rawReply.createdAt ? new Date(rawReply.createdAt) : null;
-  const createdAt =
-    parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
-      ? parsedCreatedAt.toISOString()
-      : new Date().toISOString();
-
-  const parentId = rawReply.parentId ?? fallbackParentId;
-
-  return {
-    id: String(rawReply.id ?? ""),
-    parentId: String(parentId ?? fallbackParentId),
-    author: rawReply.author ? String(rawReply.author) : "Anonyme",
-    authorId: rawReply.authorId ? String(rawReply.authorId) : undefined,
-    content: String(rawReply.content ?? ""),
-    createdAt,
-  };
-}
-
-function ensureCommentShape(rawComment: Partial<Comment>): Comment {
-  const defaultSection: CommentSection = "analysis";
-  const section = COMMENT_SECTIONS.includes((rawComment.section as CommentSection) ?? defaultSection)
-    ? ((rawComment.section as CommentSection) ?? defaultSection)
-    : defaultSection;
-
-  const parsedCreatedAt = rawComment.createdAt ? new Date(rawComment.createdAt) : null;
-  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
-    ? parsedCreatedAt.toISOString()
-    : new Date().toISOString();
-
-  const commentId = String(rawComment.id ?? "");
-  const rawReplies =
-    rawComment && typeof rawComment === "object" && "replies" in rawComment
-      ? (rawComment as { replies?: CommentReply[] }).replies
-      : undefined;
-  const replies = Array.isArray(rawReplies)
-    ? rawReplies.map((reply) => ensureReplyShape(reply, commentId))
-    : [];
-
-  return {
-    id: commentId,
-    section,
-    author: rawComment.author ? String(rawComment.author) : "Anonyme",
-    authorId: rawComment.authorId ? String(rawComment.authorId) : undefined,
-    content: String(rawComment.content ?? ""),
-    createdAt,
-    replies,
-  };
-}
-
-function buildPostFilter(id: string): Filter<MongoPostDocument> {
-  const filters: Record<string, unknown>[] = [{ id }, { _id: id }];
-
-  if (ObjectId.isValid(id)) {
-    filters.push({ _id: new ObjectId(id) });
+  const query = new URLSearchParams();
+  for (const [key, value] of entries) {
+    if (value) {
+      query.set(key, value);
+    }
   }
 
-  return { $or: filters } as Filter<MongoPostDocument>;
+  return `?${query.toString()}`;
 }
 
-function toPostForViewer(post: NormalisedPost, viewerId?: string): Post {
-  const { likedBy, ...rest } = post;
-  const viewerHasLiked = viewerId ? likedBy.includes(viewerId) : undefined;
-
-  return {
-    ...rest,
-    viewerHasLiked,
-  };
+async function expectJson<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Réponse inattendue du service db-accessor");
+  }
+  return (await response.json()) as T;
 }
 
 export async function readPosts(viewerId?: string): Promise<Post[]> {
-  const db = await getDb();
-  const documents = await db
-    .collection<MongoPostDocument>(POSTS_COLLECTION)
-    .find({})
-    .sort({ createdAt: -1 })
-    .toArray();
+  const response = await dbAccessorFetch(`/posts${buildQuery({ viewerId })}`);
 
-  const normalised = documents.map((document) => ensurePostShape(document));
-  const posts = normalised.map((post) => toPostForViewer(post, viewerId));
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer les publications.");
+  }
 
-  return posts.sort(
-    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-  );
+  return expectJson<Post[]>(response);
 }
 
 export async function readPostById(id: string, viewerId?: string): Promise<Post | null> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
-  const filter = buildPostFilter(id);
+  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}${buildQuery({ viewerId })}`);
 
-  const document = await collection.findOne(filter);
-
-  if (!document) {
+  if (response.status === 404) {
     return null;
   }
 
-  const normalised = ensurePostShape(document);
-  return toPostForViewer(normalised, viewerId);
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer la publication.");
+  }
+
+  return expectJson<Post>(response);
 }
 
 export async function createPost(post: Post): Promise<Post> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
-
-  if (!post.id) {
-    throw new Error("Post id is required");
-  }
-
-  const document: MongoPostDocument = {
+  const payload = {
     id: post.id,
     title: post.title,
     summary: post.summary,
     sourceUrl: post.sourceUrl,
     tags: post.tags,
-    createdAt: post.createdAt,
-    likes: 0,
-    comments: post.comments.map((comment) => ensureCommentShape(comment)),
-    likedBy: [],
   };
 
-  await collection.insertOne({ ...document, _id: document.id });
+  const response = await dbAccessorFetch("/posts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
-  const normalised = ensurePostShape(document);
-  return toPostForViewer(normalised);
+  if (!response.ok) {
+    throw new Error("Impossible de créer la publication.");
+  }
+
+  return expectJson<Post>(response);
 }
 
-export async function findPostBySourceUrl(sourceUrl: string): Promise<Post | null> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+export async function findPostBySourceUrl(sourceUrl: string, viewerId?: string): Promise<Post | null> {
+  const response = await dbAccessorFetch(
+    `/posts/source${buildQuery({ sourceUrl, viewerId })}`,
+  );
 
-  const document = await collection.findOne({ sourceUrl });
-
-  if (!document) {
+  if (response.status === 404) {
     return null;
   }
 
-  const normalised = ensurePostShape(document);
-  return toPostForViewer(normalised);
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer la publication via son URL source.");
+  }
+
+  return expectJson<Post>(response);
 }
 
 export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const response = await dbAccessorFetch(`/posts/source/exists${buildQuery({ sourceUrl })}`);
 
-  const count = await collection.countDocuments({ sourceUrl }, { limit: 1 });
+  if (!response.ok) {
+    throw new Error("Impossible de vérifier l'existence de la publication.");
+  }
 
-  return count > 0;
+  const payload = await expectJson<{ exists: boolean }>(response);
+  return Boolean(payload.exists);
 }
 
 export async function togglePostLikeByUser(
   id: string,
   userId: string,
 ): Promise<{ post: Post | null; viewerHasLiked: boolean }> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
-  const filter = buildPostFilter(id);
+  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}/like`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
 
-  const existingDocument = await collection.findOne(filter);
-
-  if (!existingDocument) {
+  if (response.status === 404) {
     return { post: null, viewerHasLiked: false };
   }
 
-  const likedBy = normaliseLikedBy(existingDocument.likedBy);
-  const alreadyLiked = likedBy.includes(userId);
-
-  const removalTargets: (string | ObjectId)[] = [userId];
-
-  if (ObjectId.isValid(userId)) {
-    removalTargets.push(new ObjectId(userId));
+  if (!response.ok) {
+    throw new Error("Impossible de mettre à jour le like de la publication.");
   }
 
-  const update = alreadyLiked
-    ? { $pull: { likedBy: { $in: removalTargets } } }
-    : { $addToSet: { likedBy: userId } };
-
-  const updateResult = await collection.updateOne(filter, update);
-
-  if (!updateResult.matchedCount) {
-    return { post: null, viewerHasLiked: alreadyLiked };
-  }
-
-  const updatedDocument = await collection.findOne(filter);
-
-  if (!updatedDocument) {
-    return { post: null, viewerHasLiked: alreadyLiked };
-  }
-
-  const normalised = ensurePostShape(updatedDocument);
-
-  return {
-    post: toPostForViewer(normalised, userId),
-    viewerHasLiked: !alreadyLiked,
-  };
+  const post = await expectJson<Post>(response);
+  return { post, viewerHasLiked: Boolean(post.viewerHasLiked) };
 }
 
 export async function addCommentToPost(
@@ -263,26 +124,23 @@ export async function addCommentToPost(
   comment: Comment,
   viewerId?: string,
 ): Promise<Post | null> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const response = await dbAccessorFetch(
+    `/posts/${encodeURIComponent(id)}/comments${buildQuery({ viewerId })}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ comment }),
+    },
+  );
 
-  const ensuredComment = ensureCommentShape(comment);
-  const filter = buildPostFilter(id);
-
-  const updateResult = await collection.updateOne(filter, { $push: { comments: ensuredComment } });
-
-  if (!updateResult.matchedCount) {
+  if (response.status === 404) {
     return null;
   }
 
-  const updatedDocument = await collection.findOne(filter);
-
-  if (!updatedDocument) {
-    return null;
+  if (!response.ok) {
+    throw new Error("Impossible d'ajouter le commentaire.");
   }
 
-  const normalised = ensurePostShape(updatedDocument);
-  return toPostForViewer(normalised, viewerId);
+  return expectJson<Post>(response);
 }
 
 export async function addReplyToComment(
@@ -291,27 +149,26 @@ export async function addReplyToComment(
   reply: CommentReply,
   viewerId?: string,
 ): Promise<Post | null> {
-  const db = await getDb();
-  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const response = await dbAccessorFetch(
+    `/posts/${encodeURIComponent(id)}/comments${buildQuery({ viewerId })}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        reply: {
+          ...reply,
+          parentId,
+        },
+      }),
+    },
+  );
 
-  const ensuredReply = ensureReplyShape(reply, parentId);
-  ensuredReply.parentId = parentId;
-
-  const filter = { ...buildPostFilter(id), "comments.id": parentId } as Filter<MongoPostDocument>;
-  const updateResult = await collection.updateOne(filter, {
-    $push: { "comments.$.replies": ensuredReply },
-  });
-
-  if (!updateResult.matchedCount) {
+  if (response.status === 404) {
     return null;
   }
 
-  const updatedDocument = await collection.findOne(buildPostFilter(id));
-
-  if (!updatedDocument) {
-    return null;
+  if (!response.ok) {
+    throw new Error("Impossible d'ajouter la réponse.");
   }
 
-  const normalised = ensurePostShape(updatedDocument);
-  return toPostForViewer(normalised, viewerId);
+  return expectJson<Post>(response);
 }
