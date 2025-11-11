@@ -78,10 +78,12 @@ components:
       required:
         - id
         - title
-        - content
-        - author
+        - summary
+        - sourceUrl
+        - tags
         - createdAt
-        - updatedAt
+        - likes
+        - comments
       properties:
         id:
           type: string
@@ -90,41 +92,134 @@ components:
           type: string
           description: Titre du poste.
           minLength: 1
-        content:
+        summary:
           type: string
-          description: Contenu du poste.
+          description: Résumé court du poste.
           minLength: 1
-        author:
+        sourceUrl:
           type: string
-          description: Auteur du poste.
-          minLength: 1
+          format: uri
+          description: Lien vers la source d'origine.
+        tags:
+          type: array
+          description: Liste des étiquettes associées au poste.
+          items:
+            type: string
         createdAt:
           type: string
           format: date-time
           description: Date de création du poste.
-        updatedAt:
+        likes:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Nombre de mentions « j'aime ».
+        comments:
+          type: array
+          description: Commentaires associés au poste.
+          items:
+            $ref: '#/components/schemas/PostComment'
+        viewerHasLiked:
+          type: boolean
+          nullable: true
+          description: Indique si l'utilisateur courant a déjà aimé le poste.
+    PostComment:
+      type: object
+      required:
+        - id
+        - section
+        - author
+        - content
+        - createdAt
+        - replies
+      properties:
+        id:
+          type: string
+          description: Identifiant du commentaire.
+        section:
+          $ref: '#/components/schemas/PostCommentSection'
+        author:
+          type: string
+          description: Nom complet de l'auteur du commentaire.
+        authorId:
+          type: string
+          nullable: true
+          description: Identifiant interne de l'auteur du commentaire.
+        content:
+          type: string
+          description: Contenu du commentaire.
+        createdAt:
           type: string
           format: date-time
-          description: Date de dernière modification du poste.
+          description: Date de création du commentaire.
+        replies:
+          type: array
+          description: Réponses associées au commentaire.
+          items:
+            $ref: '#/components/schemas/PostCommentReply'
+    PostCommentReply:
+      type: object
+      required:
+        - id
+        - parentId
+        - author
+        - content
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Identifiant de la réponse.
+        parentId:
+          type: string
+          description: Identifiant du commentaire parent.
+        author:
+          type: string
+          description: Nom complet de l'auteur de la réponse.
+        authorId:
+          type: string
+          nullable: true
+          description: Identifiant interne de l'auteur de la réponse.
+        content:
+          type: string
+          description: Contenu de la réponse.
+        createdAt:
+          type: string
+          format: date-time
+          description: Date de création de la réponse.
+    PostCommentSection:
+      type: string
+      description: Section du débat à laquelle se rattache le commentaire.
+      enum:
+        - analysis
+        - debate
+        - question
+        - proposal
+        - avis
     CreatePostRequest:
       type: object
       required:
         - title
-        - content
-        - author
+        - summary
+        - sourceUrl
       properties:
         title:
           type: string
           description: Titre du poste.
           minLength: 1
-        content:
+        summary:
           type: string
-          description: Contenu du poste.
+          description: Résumé court du poste.
           minLength: 1
-        author:
+        sourceUrl:
           type: string
-          description: Auteur du poste.
-          minLength: 1
+          format: uri
+          description: Lien vers la source d'origine.
+        tags:
+          type: array
+          description: Liste des étiquettes associées au poste.
+          items:
+            type: string
+          default: []
     ErrorResponse:
       type: object
       required:
