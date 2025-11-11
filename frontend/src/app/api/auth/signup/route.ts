@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createUser, getUserByEmail } from "@/lib/users";
 import {
   createUserSession,
-  determineUserRole,
   hashPassword,
   setSessionCookie,
 } from "@/lib/auth";
@@ -45,13 +44,11 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await hashPassword(password);
-  const role = determineUserRole(email);
 
   const user = await createUser({
     name: name.trim(),
     email: email.trim(),
     passwordHash,
-    role,
   });
 
   const session = await createUserSession(user.id);

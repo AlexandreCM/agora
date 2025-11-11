@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import { getDb } from "@/lib/mongodb";
 import { getUserById, deleteUserSessions } from "@/lib/users";
-import type { User, UserRole } from "@/types/user";
+import type { User } from "@/types/user";
 
 const scrypt = promisify(nodeScrypt);
 
@@ -125,15 +125,6 @@ export function setSessionCookie(token: string, expiresAt: Date) {
 
 export function clearSessionCookie() {
   cookies().delete(SESSION_COOKIE_NAME);
-}
-
-export function determineUserRole(email: string): UserRole {
-  const adminList = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-
-  return adminList.includes(email.toLowerCase()) ? "admin" : "user";
 }
 
 export async function resetUserSessions(userId: string) {
