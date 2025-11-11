@@ -18,7 +18,7 @@ public class PostDocument {
     private List<String> tags = new ArrayList<>();
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
-    private int likes;
+    private List<String> likedBy = new ArrayList<>();
     private List<PostCommentDocument> comments = new ArrayList<>();
 
     public String getId() {
@@ -77,12 +77,12 @@ public class PostDocument {
         this.tags = tags != null ? tags : new ArrayList<>();
     }
 
-    public int getLikes() {
-        return likes;
+    public List<String> getLikedBy() {
+        return likedBy;
     }
 
-    public void setLikes(int likes) {
-        this.likes = likes;
+    public void setLikedBy(List<String> likedBy) {
+        this.likedBy = likedBy != null ? likedBy : new ArrayList<>();
     }
 
     public List<PostCommentDocument> getComments() {
@@ -97,7 +97,7 @@ public class PostDocument {
 
         private String id;
         private String section;
-        private String author;
+        private String authorName;
         private String authorId;
         private String content;
         private OffsetDateTime createdAt;
@@ -119,12 +119,12 @@ public class PostDocument {
             this.section = section;
         }
 
-        public String getAuthor() {
-            return author;
+        public String getAuthorName() {
+            return authorName;
         }
 
-        public void setAuthor(String author) {
-            this.author = author;
+        public void setAuthorName(String authorName) {
+            this.authorName = authorName;
         }
 
         public String getAuthorId() {
@@ -164,7 +164,7 @@ public class PostDocument {
 
         private String id;
         private String parentId;
-        private String author;
+        private String authorName;
         private String authorId;
         private String content;
         private OffsetDateTime createdAt;
@@ -185,12 +185,12 @@ public class PostDocument {
             this.parentId = parentId;
         }
 
-        public String getAuthor() {
-            return author;
+        public String getAuthorName() {
+            return authorName;
         }
 
-        public void setAuthor(String author) {
-            this.author = author;
+        public void setAuthorName(String authorName) {
+            this.authorName = authorName;
         }
 
         public String getAuthorId() {

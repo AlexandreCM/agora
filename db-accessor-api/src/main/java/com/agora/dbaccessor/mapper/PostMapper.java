@@ -31,7 +31,7 @@ public class PostMapper {
         }
         post.setTags(new ArrayList<>(Optional.ofNullable(document.getTags()).orElseGet(List::of)));
         post.setCreatedAt(document.getCreatedAt());
-        post.setLikes(document.getLikes());
+        post.setLikedBy(document.getLikedBy());
         post.setComments(mapComments(document.getComments()));
         return post;
     }
@@ -47,7 +47,7 @@ public class PostMapper {
         document.setTags(new ArrayList<>(Optional.ofNullable(request.getTags()).orElseGet(Collections::emptyList)));
         document.setCreatedAt(now);
         document.setUpdatedAt(now);
-        document.setLikes(0);
+        document.setLikedBy(new ArrayList<>());
         document.setComments(new ArrayList<>());
         return document;
     }
@@ -74,8 +74,8 @@ public class PostMapper {
         if (document.getSection() != null) {
             comment.setSection(PostCommentSection.fromValue(document.getSection()));
         }
-        comment.setAuthor(document.getAuthor());
-        comment.authorId(document.getAuthorId());
+        comment.setAuthorName(document.getAuthorName());
+        comment.setAuthorId(document.getAuthorId());
         comment.setContent(document.getContent());
         comment.setCreatedAt(document.getCreatedAt());
         comment.setReplies(mapReplies(document.getReplies()));
@@ -95,8 +95,8 @@ public class PostMapper {
         PostCommentReply reply = new PostCommentReply();
         reply.setId(document.getId());
         reply.setParentId(document.getParentId());
-        reply.setAuthor(document.getAuthor());
-        reply.authorId(document.getAuthorId());
+        reply.setAuthorName(document.getAuthorName());
+        reply.setAuthorId(document.getAuthorId());
         reply.setContent(document.getContent());
         reply.setCreatedAt(document.getCreatedAt());
         return reply;

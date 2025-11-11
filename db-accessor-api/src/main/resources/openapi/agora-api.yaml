@@ -1,20 +1,22 @@
 openapi: 3.0.3
 info:
-  title: API d'accès aux postes
+  title: Agora Database Access API
   version: 1.0.0
-  description: API permettant de créer et de consulter des postes dans MongoDB.
+  description: This API provides access to the Agora database.
+
 servers:
   - url: http://localhost:8080
+
 paths:
   /posts:
     get:
       operationId: listPosts
       tags:
         - Posts
-      summary: Récupère la liste des postes.
+      summary: Retrieves the list of posts.
       responses:
         '200':
-          description: Liste des postes.
+          description: List of posts.
           content:
             application/json:
               schema:
@@ -25,7 +27,7 @@ paths:
       operationId: createPost
       tags:
         - Posts
-      summary: Crée un nouveau poste.
+      summary: Creates a new post.
       requestBody:
         required: true
         content:
@@ -34,13 +36,13 @@ paths:
               $ref: '#/components/schemas/CreatePostRequest'
       responses:
         '201':
-          description: Poste créé.
+          description: Post created.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Post'
         '400':
-          description: Requête invalide.
+          description: Invalid request.
           content:
             application/json:
               schema:
@@ -50,27 +52,28 @@ paths:
       operationId: getPost
       tags:
         - Posts
-      summary: Récupère un poste via son identifiant.
+      summary: Retrieves a post by its identifier.
       parameters:
         - in: path
           name: postId
           required: true
           schema:
             type: string
-          description: Identifiant du poste recherché.
+          description: Identifier of the requested post.
       responses:
         '200':
-          description: Poste trouvé.
+          description: Post found.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Post'
         '404':
-          description: Poste introuvable.
+          description: Post not found.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     Post:
@@ -87,74 +90,70 @@ components:
       properties:
         id:
           type: string
-          description: Identifiant unique du poste.
+          description: Unique identifier of the post.
         title:
           type: string
-          description: Titre du poste.
+          description: Title of the post.
           minLength: 1
         summary:
           type: string
-          description: Résumé court du poste.
+          description: Short summary of the post.
           minLength: 1
         sourceUrl:
           type: string
           format: uri
-          description: Lien vers la source d'origine.
+          description: Link to the original source.
         tags:
           type: array
-          description: Liste des étiquettes associées au poste.
+          description: List of tags associated with the post.
           items:
             type: string
         createdAt:
           type: string
           format: date-time
-          description: Date de création du poste.
-        likes:
-          type: integer
-          format: int32
-          minimum: 0
-          description: Nombre de mentions « j'aime ».
+          description: Post creation date.
+        likedBy:
+          type: array
+          description: List of user identifiers who liked the post.
+          items:
+            type: string
         comments:
           type: array
-          description: Commentaires associés au poste.
+          description: Comments associated with the post.
           items:
             $ref: '#/components/schemas/PostComment'
-        viewerHasLiked:
-          type: boolean
-          nullable: true
-          description: Indique si l'utilisateur courant a déjà aimé le poste.
     PostComment:
       type: object
       required:
         - id
         - section
-        - author
+        - authorName
+        - authorId
         - content
         - createdAt
         - replies
       properties:
         id:
           type: string
-          description: Identifiant du commentaire.
+          description: Comment identifier.
         section:
           $ref: '#/components/schemas/PostCommentSection'
-        author:
+        authorName:
           type: string
-          description: Nom complet de l'auteur du commentaire.
+          description: Full name of the comment author.
         authorId:
           type: string
-          nullable: true
-          description: Identifiant interne de l'auteur du commentaire.
+          description: Internal identifier of the comment author.
         content:
           type: string
-          description: Contenu du commentaire.
+          description: Comment content.
         createdAt:
           type: string
           format: date-time
-          description: Date de création du commentaire.
+          description: Comment creation date.
         replies:
           type: array
-          description: Réponses associées au commentaire.
+          description: Replies associated with the comment.
           items:
             $ref: '#/components/schemas/PostCommentReply'
     PostCommentReply:
@@ -162,33 +161,33 @@ components:
       required:
         - id
         - parentId
-        - author
+        - authorName
+        - authorId
         - content
         - createdAt
       properties:
         id:
           type: string
-          description: Identifiant de la réponse.
+          description: Reply identifier.
         parentId:
           type: string
-          description: Identifiant du commentaire parent.
-        author:
+          description: Identifier of the parent comment.
+        authorName:
           type: string
-          description: Nom complet de l'auteur de la réponse.
+          description: Full name of the reply author.
         authorId:
           type: string
-          nullable: true
-          description: Identifiant interne de l'auteur de la réponse.
+          description: Internal identifier of the reply author.
         content:
           type: string
-          description: Contenu de la réponse.
+          description: Reply content.
         createdAt:
           type: string
           format: date-time
-          description: Date de création de la réponse.
+          description: Reply creation date.
     PostCommentSection:
       type: string
-      description: Section du débat à laquelle se rattache le commentaire.
+      description: Debate section to which the comment belongs.
       enum:
         - analysis
         - debate
@@ -201,25 +200,25 @@ components:
         - title
         - summary
         - sourceUrl
+        - tags
       properties:
         title:
           type: string
-          description: Titre du poste.
+          description: Post title.
           minLength: 1
         summary:
           type: string
-          description: Résumé court du poste.
+          description: Short summary of the post.
           minLength: 1
         sourceUrl:
           type: string
           format: uri
-          description: Lien vers la source d'origine.
+          description: Link to the original source.
         tags:
           type: array
-          description: Liste des étiquettes associées au poste.
+          description: List of tags associated with the post.
           items:
             type: string
-          default: []
     ErrorResponse:
       type: object
       required:
@@ -228,7 +227,7 @@ components:
       properties:
         code:
           type: string
-          description: Code de l'erreur.
+          description: Error code.
         message:
           type: string
-          description: Description de l'erreur.
+          description: Error description.
