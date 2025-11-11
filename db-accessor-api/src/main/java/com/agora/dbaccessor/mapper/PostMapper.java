@@ -1,6 +1,7 @@
 package com.agora.dbaccessor.mapper;
 
 import java.time.OffsetDateTime;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +26,9 @@ public class PostMapper {
         post.setId(document.getId());
         post.setTitle(document.getTitle());
         post.setSummary(document.getSummary());
-        post.setSourceUrl(document.getSourceUrl());
+        if (document.getSourceUrl() != null) {
+            post.setSourceUrl(URI.create(document.getSourceUrl()));
+        }
         post.setTags(new ArrayList<>(Optional.ofNullable(document.getTags()).orElseGet(List::of)));
         post.setCreatedAt(document.getCreatedAt());
         post.setLikes(document.getLikes());
@@ -38,7 +41,9 @@ public class PostMapper {
         PostDocument document = new PostDocument();
         document.setTitle(request.getTitle());
         document.setSummary(request.getSummary());
-        document.setSourceUrl(request.getSourceUrl());
+        if (request.getSourceUrl() != null) {
+            document.setSourceUrl(request.getSourceUrl().toString());
+        }
         document.setTags(new ArrayList<>(Optional.ofNullable(request.getTags()).orElseGet(Collections::emptyList)));
         document.setCreatedAt(now);
         document.setUpdatedAt(now);
@@ -70,7 +75,7 @@ public class PostMapper {
             comment.setSection(PostCommentSection.fromValue(document.getSection()));
         }
         comment.setAuthor(document.getAuthor());
-        comment.setAuthorId(document.getAuthorId());
+        comment.authorId(document.getAuthorId());
         comment.setContent(document.getContent());
         comment.setCreatedAt(document.getCreatedAt());
         comment.setReplies(mapReplies(document.getReplies()));
@@ -91,7 +96,7 @@ public class PostMapper {
         reply.setId(document.getId());
         reply.setParentId(document.getParentId());
         reply.setAuthor(document.getAuthor());
-        reply.setAuthorId(document.getAuthorId());
+        reply.authorId(document.getAuthorId());
         reply.setContent(document.getContent());
         reply.setCreatedAt(document.getCreatedAt());
         return reply;
