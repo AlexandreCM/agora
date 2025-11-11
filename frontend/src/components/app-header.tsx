@@ -16,7 +16,6 @@ export function AppHeader() {
         </Link>
         <nav className="nav-links">
           <Link href="/">Fil d'actualité</Link>
-          {user?.role === "admin" && <Link href="/admin">Admin</Link>}
         </nav>
         <div className="auth-links">
           {user ? (
