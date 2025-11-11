@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 
 import { getDb } from "@/lib/mongodb";
-import type { User, UserRole, UserWithPassword } from "@/types/user";
+import type { User, UserWithPassword } from "@/types/user";
 
 interface UserDocument {
   _id?: string | ObjectId;
@@ -9,7 +9,6 @@ interface UserDocument {
   name?: string;
   email?: string;
   passwordHash?: string;
-  role?: UserRole;
   createdAt?: string;
 }
 
@@ -27,7 +26,6 @@ function mapUser(document: UserDocument): User {
     id,
     name: document.name ? String(document.name) : "",
     email: document.email ? String(document.email).toLowerCase() : "",
-    role: document.role ?? "user",
     createdAt,
   };
 }
@@ -69,7 +67,6 @@ interface CreateUserInput {
   name: string;
   email: string;
   passwordHash: string;
-  role: UserRole;
 }
 
 export async function createUser(input: CreateUserInput): Promise<User> {
@@ -80,7 +77,6 @@ export async function createUser(input: CreateUserInput): Promise<User> {
     id: new ObjectId().toHexString(),
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
-    role: input.role,
     passwordHash: input.passwordHash,
     createdAt: now,
   };
