@@ -11,14 +11,14 @@ interface RouteContext {
 }
 
 export async function POST(_request: Request, context: RouteContext) {
-  const { id } = context.params;
+  const { id: postId } = context.params;
   const user = await getCurrentUser();
 
   if (!user) {
     return NextResponse.json({ message: "Authentification requise." }, { status: 401 });
   }
 
-  const result = await togglePostLikeByUser(id, user.id);
+  const result = await togglePostLikeByUser(postId, user.id);
   const updatedPost = result.post;
 
   if (!updatedPost) {

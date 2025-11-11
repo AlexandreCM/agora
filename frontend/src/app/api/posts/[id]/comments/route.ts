@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     replies: [],
   };
 
-  const updatedPost: Post | null = await addCommentToPost(id, newComment, user.id);
+  const updatedPost: Post | null = await addCommentToPost(id, newComment);
 
   if (!updatedPost) {
     return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });

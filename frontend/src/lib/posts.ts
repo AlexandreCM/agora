@@ -26,8 +26,8 @@ async function expectJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function readPosts(viewerId?: string): Promise<Post[]> {
-  const response = await dbAccessorFetch(`/posts${buildQuery({ viewerId })}`);
+export async function readPosts(): Promise<Post[]> {
+  const response = await dbAccessorFetch("/posts");
 
   if (!response.ok) {
     throw new Error("Impossible de récupérer les publications.");
@@ -36,8 +36,8 @@ export async function readPosts(viewerId?: string): Promise<Post[]> {
   return expectJson<Post[]>(response);
 }
 
-export async function readPostById(id: string, viewerId?: string): Promise<Post | null> {
-  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}${buildQuery({ viewerId })}`);
+export async function readPostById(id: string): Promise<Post | null> {
+  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}`);
 
   if (response.status === 404) {
     return null;
@@ -71,38 +71,11 @@ export async function createPost(post: Post): Promise<Post> {
   return expectJson<Post>(response);
 }
 
-export async function findPostBySourceUrl(sourceUrl: string, viewerId?: string): Promise<Post | null> {
-  const response = await dbAccessorFetch(
-    `/posts/source${buildQuery({ sourceUrl, viewerId })}`,
-  );
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error("Impossible de récupérer la publication via son URL source.");
-  }
-
-  return expectJson<Post>(response);
-}
-
-export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean> {
-  const response = await dbAccessorFetch(`/posts/source/exists${buildQuery({ sourceUrl })}`);
-
-  if (!response.ok) {
-    throw new Error("Impossible de vérifier l'existence de la publication.");
-  }
-
-  const payload = await expectJson<{ exists: boolean }>(response);
-  return Boolean(payload.exists);
-}
-
 export async function togglePostLikeByUser(
-  id: string,
+  postId: string,
   userId: string,
 ): Promise<{ post: Post | null; viewerHasLiked: boolean }> {
-  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}/like`, {
+  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(postId)}/like`, {
     method: "POST",
     body: JSON.stringify({ userId }),
   });
@@ -122,10 +95,9 @@ export async function togglePostLikeByUser(
 export async function addCommentToPost(
   id: string,
   comment: Comment,
-  viewerId?: string,
 ): Promise<Post | null> {
   const response = await dbAccessorFetch(
-    `/posts/${encodeURIComponent(id)}/comments${buildQuery({ viewerId })}`,
+    `/posts/${encodeURIComponent(id)}/comments`,
     {
       method: "POST",
       body: JSON.stringify({ comment }),
@@ -147,10 +119,9 @@ export async function addReplyToComment(
   id: string,
   parentId: string,
   reply: CommentReply,
-  viewerId?: string,
 ): Promise<Post | null> {
   const response = await dbAccessorFetch(
-    `/posts/${encodeURIComponent(id)}/comments${buildQuery({ viewerId })}`,
+    `/posts/${encodeURIComponent(id)}/comments`,
     {
       method: "POST",
       body: JSON.stringify({

@@ -1,14 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import { getCurrentUser } from "@/lib/auth";
-import { createPost, readPosts } from "@/lib/posts";
-import type { Post } from "@/types/post";
+import { readPosts } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  const posts = await readPosts(user?.id);
+  const posts = await readPosts();
   return NextResponse.json(posts);
 }
