@@ -1,6 +1,7 @@
 package com.agora.dbaccessor.api.controller;
 
 import java.net.URI;
+import java.util.Objects;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -37,7 +38,7 @@ public class UserController {
     @PostMapping
     public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserRequest request) {
         User created = userService.createUser(request);
-        return ResponseEntity.created(URI.create("/users/" + created.getId())).body(created);
+        return ResponseEntity.created(Objects.requireNonNull(URI.create("/users/" + created.getId()))).body(created);
     }
 
     @GetMapping(params = "email")

@@ -1,6 +1,7 @@
 package com.agora.dbaccessor.api.controller;
 
 import java.net.URI;
+import java.util.Objects;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -33,7 +34,7 @@ public class SessionController {
     @PostMapping
     public ResponseEntity<Session> createSession(@Valid @RequestBody CreateSessionRequest request) {
         Session created = sessionService.createSession(request);
-        return ResponseEntity.created(URI.create("/sessions/" + created.getTokenHash())).body(created);
+        return ResponseEntity.created(Objects.requireNonNull(URI.create("/sessions/" + created.getTokenHash()))).body(created);
     }
 
     @DeleteMapping("/{tokenHash}")

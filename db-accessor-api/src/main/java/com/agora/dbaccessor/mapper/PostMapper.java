@@ -25,18 +25,16 @@ public interface PostMapper {
     @Mapping(target = "tags", expression = "java(copyStrings(document.tags()))")
     @Mapping(target = "likedBy", expression = "java(copyStrings(document.likedBy()))")
     @Mapping(target = "comments", expression = "java(mapComments(document.comments()))")
-    @Mapping(target = "likes", expression = "java(calculateLikes(document.likedBy()))")
-    @Mapping(target = "viewerHasLiked", ignore = true)
     Post toApi(PostDocument document);
 
     @Mapping(target = "section", expression = "java(toSection(document.section()))")
     @Mapping(target = "replies", expression = "java(mapReplies(document.replies()))")
-    @Mapping(target = "author", expression = "java(document.author())")
     @Mapping(target = "authorId", expression = "java(document.authorId())")
+    @Mapping(target = "authorName", expression = "java(document.authorName())")
     PostComment toApi(PostCommentDocument document);
 
-    @Mapping(target = "author", expression = "java(document.author())")
     @Mapping(target = "authorId", expression = "java(document.authorId())")
+    @Mapping(target = "authorName", expression = "java(document.authorName())")
     PostCommentReply toApi(PostCommentReplyDocument document);
 
     @Mapping(target = "id", expression = "java(request.getId())")
@@ -88,20 +86,5 @@ public interface PostMapper {
 
     default int calculateLikes(List<String> likedBy) {
         return likedBy != null ? likedBy.size() : 0;
-    }
-
-    default Post toApi(PostDocument document, String viewerId) {
-        Post post = toApi(document);
-
-        if (viewerId != null && !viewerId.isBlank()) {
-            boolean viewerHasLiked = post.getLikedBy() != null && post.getLikedBy().stream()
-                    .filter(value -> value != null && !value.isBlank())
-                    .anyMatch(value -> value.equals(viewerId));
-            post.setViewerHasLiked(viewerHasLiked);
-        } else {
-            post.setViewerHasLiked(null);
-        }
-
-        return post;
     }
 }

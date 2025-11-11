@@ -9,15 +9,13 @@ import com.agora.dbaccessor.generated.model.TogglePostLikeRequest;
 
 public interface PostService {
 
-    List<Post> listPosts(String viewerId);
+    List<Post> listPosts();
 
-    Post getPost(String id, String viewerId);
+    Post getPost(String id);
 
     Post createPost(CreatePostRequest request);
 
-    Post findPostBySourceUrl(String sourceUrl, String viewerId);
-
-    boolean postExistsBySourceUrl(String sourceUrl);
+    Post findPostBySourceUrl(String sourceUrl);
 
     Post togglePostLike(String id, TogglePostLikeRequest request);
 

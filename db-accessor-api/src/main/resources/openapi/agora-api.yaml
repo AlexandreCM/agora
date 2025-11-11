@@ -379,6 +379,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     Post:
@@ -390,7 +391,7 @@ components:
         - sourceUrl
         - tags
         - createdAt
-        - likes
+        - likedBy
         - comments
       properties:
         id:
@@ -421,19 +422,11 @@ components:
           type: string
           format: date-time
           description: Last update date of the post.
-        likes:
-          type: integer
-          format: int32
-          description: Number of likes associated with the post.
         likedBy:
           type: array
           description: List of user identifiers who liked the post.
           items:
             type: string
-        viewerHasLiked:
-          type: boolean
-          nullable: true
-          description: Indicates whether the requesting viewer has liked the post.
         comments:
           type: array
           description: Comments associated with the post.
@@ -444,7 +437,8 @@ components:
       required:
         - id
         - section
-        - author
+        - authorId
+        - authorName
         - content
         - createdAt
         - replies
@@ -454,13 +448,14 @@ components:
           description: Comment identifier.
         section:
           $ref: '#/components/schemas/PostCommentSection'
-        author:
-          type: string
-          description: Full name of the comment author.
+          description: Debate section to which the comment belongs.
+          default: avis
         authorId:
           type: string
-          nullable: true
           description: Internal identifier of the comment author.
+        authorName:
+          type: string
+          description: Full name of the comment author.
         content:
           type: string
           description: Comment content.
@@ -478,7 +473,8 @@ components:
       required:
         - id
         - parentId
-        - author
+        - authorId
+        - authorName
         - content
         - createdAt
       properties:
@@ -488,13 +484,12 @@ components:
         parentId:
           type: string
           description: Identifier of the parent comment.
-        author:
-          type: string
-          description: Full name of the reply author.
         authorId:
           type: string
-          nullable: true
           description: Internal identifier of the reply author.
+        authorName:
+          type: string
+          description: Full name of the reply author.
         content:
           type: string
           description: Reply content.
@@ -506,11 +501,11 @@ components:
       type: string
       description: Debate section to which the comment belongs.
       enum:
+        - avis
         - analysis
         - debate
         - question
         - proposal
-        - avis
     CreatePostRequest:
       type: object
       required:
@@ -563,6 +558,7 @@ components:
         exists:
           type: boolean
           description: Indicates whether a post exists for the given source URL.
+
     ErrorResponse:
       type: object
       required:
@@ -575,6 +571,7 @@ components:
         message:
           type: string
           description: Error description.
+
     User:
       type: object
       required:

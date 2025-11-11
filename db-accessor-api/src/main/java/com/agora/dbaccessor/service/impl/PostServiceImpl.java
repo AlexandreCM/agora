@@ -30,7 +30,7 @@ import com.agora.dbaccessor.service.PostService;
 @Transactional(readOnly = true)
 public class PostServiceImpl implements PostService {
 
-    private static final List<String> COMMENT_SECTIONS = List.of("analysis", "debate", "question", "proposal", "avis");
+    private static final List<String> COMMENT_SECTIONS = List.of("avis", "analysis", "debate", "question", "proposal");
 
     private final PostRepository postRepository;
     private final PostMapper postMapper;
@@ -41,19 +41,17 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public List<Post> listPosts(String viewerId) {
-        String normalisedViewerId = viewerId != null ? viewerId.trim() : null;
+    public List<Post> listPosts() {
         List<PostDocument> documents = postRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
         return documents.stream()
-                .map(document -> postMapper.toApi(document, normalisedViewerId))
+                .map(postMapper::toApi)
                 .toList();
     }
 
     @Override
-    public Post getPost(String id, String viewerId) {
-        String normalisedViewerId = viewerId != null ? viewerId.trim() : null;
+    public Post getPost(String id) {
         PostDocument document = findPostDocument(id);
-        return postMapper.toApi(document, normalisedViewerId);
+        return postMapper.toApi(document);
     }
 
     private PostDocument findPostDocument(String id) {
@@ -92,38 +90,25 @@ public class PostServiceImpl implements PostService {
                 new ArrayList<>());
 
         PostDocument saved = postRepository.save(document);
-        return postMapper.toApi(saved, null);
+        return postMapper.toApi(saved);
     }
 
     @Override
-    public Post findPostBySourceUrl(String sourceUrl, String viewerId) {
+    public Post findPostBySourceUrl(String sourceUrl) {
         String lookupUrl = normaliseSourceUrl(sourceUrl);
 
         if (lookupUrl == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source URL is required");
         }
 
-        String normalisedViewerId = viewerId != null ? viewerId.trim() : null;
-
         PostDocument document = postRepository.findBySourceUrl(lookupUrl)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        return postMapper.toApi(document, normalisedViewerId);
-    }
-
-    @Override
-    public boolean postExistsBySourceUrl(String sourceUrl) {
-        String lookupUrl = normaliseSourceUrl(sourceUrl);
-
-        if (lookupUrl == null) {
-            return false;
-        }
-
-        return postRepository.existsBySourceUrl(lookupUrl);
+        return postMapper.toApi(document);
     }
 
     @Override
     @Transactional
-    public Post togglePostLike(String id, TogglePostLikeRequest request) {
+    public Post togglePostLike(String postId, TogglePostLikeRequest request) {
         String userId = request.getUserId();
 
         if (userId == null || userId.isBlank()) {
@@ -132,7 +117,7 @@ public class PostServiceImpl implements PostService {
 
         String normalisedUserId = userId.trim();
 
-        PostDocument document = findPostDocument(id);
+        PostDocument document = findPostDocument(postId);
         List<String> likedBy = document.likedBy().stream()
                 .filter(value -> value != null && !value.trim().isEmpty())
                 .map(String::trim)
@@ -151,7 +136,7 @@ public class PostServiceImpl implements PostService {
         PostDocument updated = rebuildDocument(document, likedBy, document.comments());
         PostDocument saved = postRepository.save(updated);
 
-        return postMapper.toApi(saved, normalisedUserId);
+        return postMapper.toApi(saved);
     }
 
     @Override
@@ -162,19 +147,13 @@ public class PostServiceImpl implements PostService {
         if (request.getReply() != null) {
             PostDocument updated = appendReply(document, request.getReply());
             PostDocument saved = postRepository.save(updated);
-            String viewer = viewerId != null && !viewerId.trim().isEmpty()
-                    ? viewerId.trim()
-                    : request.getReply().getAuthorId();
-            return postMapper.toApi(saved, viewer);
+            return postMapper.toApi(saved);
         }
 
         if (request.getComment() != null) {
             PostDocument updated = appendComment(document, request.getComment());
             PostDocument saved = postRepository.save(updated);
-            String viewer = viewerId != null && !viewerId.trim().isEmpty()
-                    ? viewerId.trim()
-                    : request.getComment().getAuthorId();
-            return postMapper.toApi(saved, viewer);
+            return postMapper.toApi(saved);
         }
 
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing comment or reply payload");
@@ -222,8 +201,8 @@ public class PostServiceImpl implements PostService {
             PostCommentDocument updatedComment = new PostCommentDocument(
                     existing.id(),
                     existing.section(),
-                    existing.author(),
                     existing.authorId(),
+                    existing.authorName(),
                     existing.content(),
                     existing.createdAt(),
                     replies);
@@ -269,13 +248,11 @@ public class PostServiceImpl implements PostService {
         String section = comment.getSection() != null ? comment.getSection().getValue() : null;
         section = normaliseSection(section);
 
-        String author = comment.getAuthor() != null ? comment.getAuthor() : "Anonyme";
-
         return new PostCommentDocument(
                 normaliseIdentifier(comment.getId()),
                 section,
-                author,
                 comment.getAuthorId(),
+                comment.getAuthorName(),
                 content,
                 createdAt,
                 replies);
@@ -283,13 +260,12 @@ public class PostServiceImpl implements PostService {
 
     private PostCommentReplyDocument toReplyDocument(PostCommentReply reply, String parentId, String content) {
         OffsetDateTime createdAt = reply.getCreatedAt() != null ? reply.getCreatedAt() : OffsetDateTime.now();
-        String author = reply.getAuthor() != null ? reply.getAuthor() : "Anonyme";
 
         return new PostCommentReplyDocument(
                 normaliseIdentifier(reply.getId()),
                 parentId,
-                author,
                 reply.getAuthorId(),
+                reply.getAuthorName(),
                 content,
                 createdAt);
     }
