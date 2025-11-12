@@ -29,11 +29,15 @@ public interface PostMapper {
 
     @Mapping(target = "section", expression = "java(toSection(document.section()))")
     @Mapping(target = "replies", expression = "java(mapReplies(document.replies()))")
+    @Mapping(target = "authorId", expression = "java(document.authorId())")
+    @Mapping(target = "authorName", expression = "java(document.authorName())")
     PostComment toApi(PostCommentDocument document);
 
+    @Mapping(target = "authorId", expression = "java(document.authorId())")
+    @Mapping(target = "authorName", expression = "java(document.authorName())")
     PostCommentReply toApi(PostCommentReplyDocument document);
 
-    @Mapping(target = "id", expression = "java(null)")
+    @Mapping(target = "id", expression = "java(toUUID())")
     @Mapping(target = "sourceUrl", expression = "java(toUrl(request.getSourceUrl()))")
     @Mapping(target = "tags", expression = "java(copyStrings(request.getTags()))")
     @Mapping(target = "createdAt", expression = "java(currentTimestamp())")
@@ -79,4 +83,9 @@ public interface PostMapper {
     default OffsetDateTime currentTimestamp() {
         return OffsetDateTime.now();
     }
+
+    default String toUUID() {
+        return java.util.UUID.randomUUID().toString();
+    }
+
 }
