@@ -45,14 +45,14 @@ public class PostServiceImpl implements PostService {
     public List<Post> listPosts() {
         List<PostDocument> documents = postRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
         return documents.stream()
-                .map(postMapper::toApi)
+                .map(postMapper::map)
                 .toList();
     }
 
     @Override
     public Post getPost(String id) {
         PostDocument document = findPostDocument(id);
-        return postMapper.toApi(document);
+        return postMapper.map(document);
     }
 
     private PostDocument findPostDocument(String id) {
@@ -63,7 +63,7 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public Post createPost(CreatePostRequest request) {
-        PostDocument mapped = postMapper.toDocument(request);
+        PostDocument mapped = postMapper.map(request);
 
         String sourceUrl = normaliseSourceUrl(mapped.sourceUrl());
 
@@ -91,7 +91,7 @@ public class PostServiceImpl implements PostService {
                 new ArrayList<>());
 
         PostDocument saved = postRepository.save(document);
-        return postMapper.toApi(saved);
+        return postMapper.map(saved);
     }
 
     @Override
@@ -104,7 +104,7 @@ public class PostServiceImpl implements PostService {
 
         PostDocument document = postRepository.findBySourceUrl(lookupUrl)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
-        return postMapper.toApi(document);
+        return postMapper.map(document);
     }
 
     @Override
@@ -137,17 +137,17 @@ public class PostServiceImpl implements PostService {
         PostDocument updated = rebuildDocument(document, likedBy, document.comments());
         PostDocument saved = postRepository.save(updated);
 
-        return postMapper.toApi(saved);
+        return postMapper.map(saved);
     }
 
     @Override
     @Transactional
     public Post addComment(String postId, CreatePostCommentRequest request) {
-        
+
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing comment payload");
         }
-        
+
         PostDocument document = findPostDocument(postId);
 
         if (document == null) {
@@ -162,10 +162,9 @@ public class PostServiceImpl implements PostService {
         comment.setContent(request.getContent());
         comment.setCreatedAt(OffsetDateTime.now());
 
-
         PostDocument updated = appendComment(document, comment);
         PostDocument saved = postRepository.save(updated);
-        return postMapper.toApi(saved);
+        return postMapper.map(saved);
     }
 
     @Override
@@ -192,7 +191,7 @@ public class PostServiceImpl implements PostService {
 
         PostDocument updated = appendReply(document, reply);
         PostDocument saved = postRepository.save(updated);
-        return postMapper.toApi(saved);
+        return postMapper.map(saved);
     }
 
     private PostDocument appendComment(PostDocument document, PostComment comment) {
@@ -255,7 +254,8 @@ public class PostServiceImpl implements PostService {
         return rebuildDocument(document, document.likedBy(), comments);
     }
 
-    private PostDocument rebuildDocument(PostDocument original, List<String> likedBy, List<PostCommentDocument> comments) {
+    private PostDocument rebuildDocument(PostDocument original, List<String> likedBy,
+            List<PostCommentDocument> comments) {
         return new PostDocument(
                 original.id(),
                 original.title(),
