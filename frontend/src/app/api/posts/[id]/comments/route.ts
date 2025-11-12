@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       createdAt: new Date().toISOString(),
     };
 
-    const updatedPost = await addReplyToComment(id, normalisedParentId, newReply);
+    const updatedPost = await addReplyToComment(id, normalisedParentId, newReply, user.id);
 
     if (!updatedPost) {
       return NextResponse.json({ message: "Commentaire introuvable." }, { status: 404 });
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     replies: [],
   };
 
-  const updatedPost: Post | null = await addCommentToPost(id, newComment);
+  const updatedPost: Post | null = await addCommentToPost(id, newComment, user.id);
 
   if (!updatedPost) {
     return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });

@@ -1,21 +1,98 @@
 import { dbAccessorFetch } from "@/lib/db-accessor-client";
-import type { Comment, CommentReply, Post } from "@/types/post";
+import { getCurrentUser } from "@/lib/auth";
+import { COMMENT_SECTIONS, type Comment, type CommentReply, type CommentSection, type Post } from "@/types/post";
 
-function buildQuery(params: Record<string, string | undefined>) {
-  const entries = Object.entries(params).filter(([, value]) => typeof value === "string" && value.length > 0);
+interface DbAccessorCommentReply {
+  id?: unknown;
+  parentId?: unknown;
+  author?: unknown;
+  authorId?: unknown;
+  content?: unknown;
+  createdAt?: unknown;
+}
 
-  if (!entries.length) {
-    return "";
+interface DbAccessorComment {
+  id?: unknown;
+  section?: unknown;
+  author?: unknown;
+  authorId?: unknown;
+  content?: unknown;
+  createdAt?: unknown;
+  replies?: unknown;
+}
+
+interface DbAccessorPost {
+  id?: unknown;
+  title?: unknown;
+  summary?: unknown;
+  sourceUrl?: unknown;
+  tags?: unknown;
+  createdAt?: unknown;
+  likedBy?: unknown;
+  comments?: unknown;
+}
+
+function normaliseString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function normaliseStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  const query = new URLSearchParams();
-  for (const [key, value] of entries) {
-    if (value) {
-      query.set(key, value);
-    }
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function normaliseCommentReply(reply: DbAccessorCommentReply): CommentReply {
+  return {
+    id: normaliseString(reply.id),
+    parentId: normaliseString(reply.parentId),
+    author: normaliseString(reply.author),
+    authorId: typeof reply.authorId === "string" ? reply.authorId : undefined,
+    content: normaliseString(reply.content),
+    createdAt: normaliseString(reply.createdAt),
+  };
+}
+
+function normaliseSection(section: unknown): CommentSection {
+  if (typeof section !== "string") {
+    return "analysis";
   }
 
-  return `?${query.toString()}`;
+  const lowerCase = section.toLowerCase();
+  return (COMMENT_SECTIONS.find((value) => value === lowerCase) ?? "analysis") as CommentSection;
+}
+
+function normaliseComment(comment: DbAccessorComment): Comment {
+  const repliesValue = Array.isArray(comment.replies) ? comment.replies : [];
+
+  return {
+    id: normaliseString(comment.id),
+    section: normaliseSection(comment.section),
+    author: normaliseString(comment.author),
+    authorId: typeof comment.authorId === "string" ? comment.authorId : undefined,
+    content: normaliseString(comment.content),
+    createdAt: normaliseString(comment.createdAt),
+    replies: repliesValue.map((reply) => normaliseCommentReply(reply as DbAccessorCommentReply)),
+  };
+}
+
+function normalisePost(post: DbAccessorPost, viewerId?: string | null): Post {
+  const likedBy = normaliseStringArray(post.likedBy);
+  const commentsValue = Array.isArray(post.comments) ? post.comments : [];
+
+  return {
+    id: normaliseString(post.id),
+    title: normaliseString(post.title),
+    summary: normaliseString(post.summary),
+    sourceUrl: normaliseString(post.sourceUrl),
+    tags: normaliseStringArray(post.tags),
+    createdAt: normaliseString(post.createdAt),
+    likes: likedBy.length,
+    comments: commentsValue.map((comment) => normaliseComment(comment as DbAccessorComment)),
+    viewerHasLiked: viewerId ? likedBy.includes(viewerId) : undefined,
+  };
 }
 
 async function expectJson<T>(response: Response): Promise<T> {
@@ -27,16 +104,19 @@ async function expectJson<T>(response: Response): Promise<T> {
 }
 
 export async function readPosts(): Promise<Post[]> {
+  const viewer = await getCurrentUser().catch(() => null);
   const response = await dbAccessorFetch("/posts");
 
   if (!response.ok) {
     throw new Error("Impossible de récupérer les publications.");
   }
 
-  return expectJson<Post[]>(response);
+  const payload = await expectJson<DbAccessorPost[]>(response);
+  return payload.map((post) => normalisePost(post, viewer?.id));
 }
 
 export async function readPostById(id: string): Promise<Post | null> {
+  const viewer = await getCurrentUser().catch(() => null);
   const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}`);
 
   if (response.status === 404) {
@@ -47,7 +127,8 @@ export async function readPostById(id: string): Promise<Post | null> {
     throw new Error("Impossible de récupérer la publication.");
   }
 
-  return expectJson<Post>(response);
+  const payload = await expectJson<DbAccessorPost>(response);
+  return normalisePost(payload, viewer?.id);
 }
 
 export async function createPost(post: Post): Promise<Post> {
@@ -68,33 +149,32 @@ export async function createPost(post: Post): Promise<Post> {
     throw new Error("Impossible de créer la publication.");
   }
 
-  return expectJson<Post>(response);
+  const result = await expectJson<DbAccessorPost>(response);
+  return normalisePost(result);
 }
 
-export async function togglePostLikeByUser(
-  postId: string,
-  userId: string,
-): Promise<{ post: Post | null; viewerHasLiked: boolean }> {
+export async function togglePostLikeByUser(postId: string, userId: string): Promise<Post | null> {
   const response = await dbAccessorFetch(`/posts/${encodeURIComponent(postId)}/like`, {
     method: "POST",
     body: JSON.stringify({ userId }),
   });
 
   if (response.status === 404) {
-    return { post: null, viewerHasLiked: false };
+    return null;
   }
 
   if (!response.ok) {
     throw new Error("Impossible de mettre à jour le like de la publication.");
   }
 
-  const post = await expectJson<Post>(response);
-  return { post, viewerHasLiked: Boolean(post.viewerHasLiked) };
+  const post = await expectJson<DbAccessorPost>(response);
+  return normalisePost(post, userId);
 }
 
 export async function addCommentToPost(
   id: string,
   comment: Comment,
+  viewerId?: string,
 ): Promise<Post | null> {
   const response = await dbAccessorFetch(
     `/posts/${encodeURIComponent(id)}/comments`,
@@ -112,13 +192,15 @@ export async function addCommentToPost(
     throw new Error("Impossible d'ajouter le commentaire.");
   }
 
-  return expectJson<Post>(response);
+  const payload = await expectJson<DbAccessorPost>(response);
+  return normalisePost(payload, viewerId);
 }
 
 export async function addReplyToComment(
   id: string,
   parentId: string,
   reply: CommentReply,
+  viewerId?: string,
 ): Promise<Post | null> {
   const response = await dbAccessorFetch(
     `/posts/${encodeURIComponent(id)}/comments`,
@@ -141,5 +223,6 @@ export async function addReplyToComment(
     throw new Error("Impossible d'ajouter la réponse.");
   }
 
-  return expectJson<Post>(response);
+  const payload = await expectJson<DbAccessorPost>(response);
+  return normalisePost(payload, viewerId);
 }
