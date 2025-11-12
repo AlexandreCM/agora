@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.agora.dbaccessor.generated.model.CreatePostCommentReplyRequest;
 import com.agora.dbaccessor.generated.model.CreatePostCommentRequest;
 import com.agora.dbaccessor.generated.model.CreatePostRequest;
 import com.agora.dbaccessor.generated.model.Post;
@@ -74,4 +75,14 @@ public class PostController {
         Post updated = postService.addComment(postId, request);
         return ResponseEntity.ok(updated);
     }
+
+    @PostMapping("/{postId}/comments/{commentId}/reply")
+    public ResponseEntity<Post> addCommentReply(
+            @PathVariable String postId,
+            @PathVariable String commentId,
+            @Valid @RequestBody CreatePostCommentReplyRequest request) {
+        Post updated = postService.addCommentReply(postId, commentId, request);
+        return ResponseEntity.ok(updated);
+    }
+    
 }

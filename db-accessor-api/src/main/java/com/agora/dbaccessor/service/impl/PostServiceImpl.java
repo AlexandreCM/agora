@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.agora.dbaccessor.generated.model.CreatePostCommentReplyRequest;
 import com.agora.dbaccessor.generated.model.CreatePostCommentRequest;
 import com.agora.dbaccessor.generated.model.CreatePostRequest;
 import com.agora.dbaccessor.generated.model.Post;
@@ -141,22 +142,57 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public Post addComment(String id, CreatePostCommentRequest request) {
-        PostDocument document = findPostDocument(id);
+    public Post addComment(String postId, CreatePostCommentRequest request) {
+        
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing comment payload");
+        }
+        
+        PostDocument document = findPostDocument(postId);
 
-        if (request.getReply() != null) {
-            PostDocument updated = appendReply(document, request.getReply());
-            PostDocument saved = postRepository.save(updated);
-            return postMapper.toApi(saved);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
         }
 
-        if (request.getComment() != null) {
-            PostDocument updated = appendComment(document, request.getComment());
-            PostDocument saved = postRepository.save(updated);
-            return postMapper.toApi(saved);
+        PostComment comment = new PostComment();
+        comment.setId(UUID.randomUUID().toString());
+        comment.setSection(request.getSection());
+        comment.setAuthorId(request.getAuthorId());
+        comment.setAuthorName(request.getAuthorName());
+        comment.setContent(request.getContent());
+        comment.setCreatedAt(OffsetDateTime.now());
+
+
+        PostDocument updated = appendComment(document, comment);
+        PostDocument saved = postRepository.save(updated);
+        return postMapper.toApi(saved);
+    }
+
+    @Override
+    @Transactional
+    public Post addCommentReply(String postId, String commentId, CreatePostCommentReplyRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing reply payload");
+        }
+        PostDocument document = findPostDocument(postId);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
+        }
+        if (!document.comments().stream().anyMatch(comment -> comment.id().equals(commentId))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found");
         }
 
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing comment or reply payload");
+        PostCommentReply reply = new PostCommentReply();
+        reply.setId(UUID.randomUUID().toString());
+        reply.setParentId(commentId);
+        reply.setAuthorId(request.getAuthorId());
+        reply.setAuthorName(request.getAuthorName());
+        reply.setContent(request.getContent());
+        reply.setCreatedAt(OffsetDateTime.now());
+
+        PostDocument updated = appendReply(document, reply);
+        PostDocument saved = postRepository.save(updated);
+        return postMapper.toApi(saved);
     }
 
     private PostDocument appendComment(PostDocument document, PostComment comment) {

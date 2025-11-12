@@ -37,7 +37,7 @@ public interface PostMapper {
     @Mapping(target = "authorName", expression = "java(document.authorName())")
     PostCommentReply toApi(PostCommentReplyDocument document);
 
-    @Mapping(target = "id", expression = "java(request.getId())")
+    @Mapping(target = "id", expression = "java(toUUID())")
     @Mapping(target = "sourceUrl", expression = "java(toUrl(request.getSourceUrl()))")
     @Mapping(target = "tags", expression = "java(copyStrings(request.getTags()))")
     @Mapping(target = "createdAt", expression = "java(currentTimestamp())")
@@ -84,7 +84,8 @@ public interface PostMapper {
         return OffsetDateTime.now();
     }
 
-    default int calculateLikes(List<String> likedBy) {
-        return likedBy != null ? likedBy.size() : 0;
+    default String toUUID() {
+        return java.util.UUID.randomUUID().toString();
     }
+
 }

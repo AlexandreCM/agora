@@ -108,7 +108,7 @@ paths:
       operationId: addPostComment
       tags:
         - Posts
-      summary: Adds a comment or reply to a post.
+      summary: Adds a comment to a post.
       parameters:
         - in: path
           name: postId
@@ -124,7 +124,51 @@ paths:
               $ref: '#/components/schemas/CreatePostCommentRequest'
       responses:
         '200':
-          description: Updated post including the new comment or reply.
+          description: Updated post including the new comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Post or comment not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /posts/{postId}/comments/{commentId}/reply:
+    post:
+      operationId: addPostCommentReply
+      tags:
+        - Posts
+      summary: Adds a reply to a comment on a post.
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the post receiving the reply.
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the comment receiving the reply.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostCommentReplyRequest'
+      responses:
+        '200':
+          description: Updated post including the new reply.
           content:
             application/json:
               schema:
@@ -468,9 +512,6 @@ components:
         - sourceUrl
         - tags
       properties:
-        id:
-          type: string
-          description: Optional identifier supplied by the caller.
         title:
           type: string
           description: Post title.
@@ -498,12 +539,43 @@ components:
           description: Identifier of the user toggling the like.
     CreatePostCommentRequest:
       type: object
+      required:
+        - section
+        - authorId
+        - authorName
+        - content
       properties:
-        comment:
-          $ref: '#/components/schemas/PostComment'
-        reply:
-          $ref: '#/components/schemas/PostCommentReply'
-      description: Request payload to create a comment or a reply. Provide either a comment or a reply.
+        section:
+          $ref: '#/components/schemas/PostCommentSection'
+          description: Debate section to which the comment belongs.
+          default: avis
+        authorId:
+          type: string
+          description: Internal identifier of the comment author.
+        authorName:
+          type: string
+          description: Full name of the comment author.
+        content:
+          type: string
+          description: Comment content.
+      description: Request payload to create a comment.
+    CreatePostCommentReplyRequest:
+      type: object
+      required:
+        - authorId
+        - authorName
+        - content
+      properties:
+        authorId:
+          type: string
+          description: Internal identifier of the reply author.
+        authorName:
+          type: string
+          description: Full name of the reply author.
+        content:
+          type: string
+          description: Reply content.
+      description: Request payload to create a reply to a comment.
 
     ErrorResponse:
       type: object
