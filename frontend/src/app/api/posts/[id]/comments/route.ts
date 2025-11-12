@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       createdAt: new Date().toISOString(),
     };
 
-    const updatedPost = await addReplyToComment(id, normalisedParentId, newReply, user.id);
+    const updatedPost = await addReplyToComment(id, normalisedParentId, newReply);
 
     if (!updatedPost) {
       return NextResponse.json({ message: "Commentaire introuvable." }, { status: 404 });
