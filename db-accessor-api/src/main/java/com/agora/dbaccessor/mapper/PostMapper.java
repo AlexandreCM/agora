@@ -9,6 +9,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
+import com.agora.dbaccessor.generated.model.CreatePostCommentReplyRequest;
+import com.agora.dbaccessor.generated.model.CreatePostCommentRequest;
 import com.agora.dbaccessor.generated.model.CreatePostRequest;
 import com.agora.dbaccessor.generated.model.Post;
 import com.agora.dbaccessor.generated.model.PostComment;
@@ -104,6 +106,36 @@ public class PostMapper {
         return new PostDocument(id, title, summary, sourceUrl, tags, now, now, likedBy, comments);
     }
 
+    public PostCommentDocument map(CreatePostCommentRequest request) {
+        if (request == null) {
+            return null;
+        }
+
+        String id = UUID.randomUUID().toString();
+        String section = request.getSection() != null ? request.getSection().toString() : PostCommentSection.AVIS.toString();
+        String authorId = request.getAuthorId();
+        String authorName = request.getAuthorName();
+        String content = request.getContent();
+        OffsetDateTime createdAt = currentTimestamp();
+        List<PostCommentReplyDocument> replies = new ArrayList<>();
+
+        return new PostCommentDocument(id, section, authorId, authorName, content, createdAt, replies);
+    }
+
+    public PostCommentReplyDocument map(String parentId, CreatePostCommentReplyRequest request) {
+        if (request == null) {
+            return null;
+        }
+
+        String id = UUID.randomUUID().toString();
+        String authorId = request.getAuthorId();
+        String authorName = request.getAuthorName();
+        String content = request.getContent() != null ? request.getContent().trim() : null;
+        OffsetDateTime createdAt = currentTimestamp();
+
+        return new PostCommentReplyDocument(id, parentId, authorId, authorName, content, createdAt);
+    }
+
     // ---------------------------------------------------------------------------
 
     private URI toUri(String sourceUrl) {
@@ -124,7 +156,7 @@ public class PostMapper {
     }
 
     private PostCommentSection toSection(String section) {
-        return section != null ? PostCommentSection.fromValue(section) : null;
+            return section != null ? PostCommentSection.fromValue(section) : PostCommentSection.AVIS;
     }
 
     private List<String> copyStrings(List<String> values) {
