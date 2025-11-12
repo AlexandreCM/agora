@@ -111,7 +111,12 @@ public class PostMapper {
     }
 
     private String toUrl(URI sourceUrl) {
-        return sourceUrl != null ? sourceUrl.toString() : null;
+        if (sourceUrl == null) {
+            return null;
+        }
+
+        String trimmed = sourceUrl.toString().trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private OffsetDateTime currentTimestamp() {

@@ -65,32 +65,23 @@ public class PostServiceImpl implements PostService {
     public Post createPost(CreatePostRequest request) {
         PostDocument mapped = postMapper.map(request);
 
-        String sourceUrl = normaliseSourceUrl(mapped.sourceUrl());
+        if (mapped.title() == null || mapped.title().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Post title is required");
+        }
 
-        if (sourceUrl == null) {
+        if (mapped.summary() == null || mapped.summary().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Post summary is required");
+        }
+
+        if (mapped.sourceUrl() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source URL is required");
         }
 
-        if (postRepository.existsBySourceUrl(sourceUrl)) {
+        if (postRepository.existsBySourceUrl(mapped.sourceUrl())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Post with this source URL already exists");
         }
 
-        String id = normaliseIdentifier(mapped.id());
-        OffsetDateTime createdAt = defaultTimestamp(mapped.createdAt());
-        OffsetDateTime updatedAt = mapped.updatedAt() != null ? mapped.updatedAt() : createdAt;
-
-        PostDocument document = new PostDocument(
-                id,
-                Objects.requireNonNullElse(mapped.title(), ""),
-                Objects.requireNonNullElse(mapped.summary(), ""),
-                sourceUrl,
-                new ArrayList<>(mapped.tags()),
-                createdAt,
-                updatedAt,
-                new ArrayList<>(),
-                new ArrayList<>());
-
-        PostDocument saved = postRepository.save(document);
+        PostDocument saved = postRepository.save(mapped);
         return postMapper.map(saved);
     }
 
