@@ -1,174 +1,261 @@
-import { dbAccessorFetch } from "@/lib/db-accessor-client";
-import { getCurrentUser } from "@/lib/auth";
-import { COMMENT_SECTIONS, type Comment, type CommentReply, type CommentSection, type Post } from "@/types/post";
+import { ObjectId, type Filter } from "mongodb";
 
-interface DbAccessorCommentReply {
-  id?: unknown;
-  parentId?: unknown;
-  author?: unknown;
-  authorId?: unknown;
-  content?: unknown;
-  createdAt?: unknown;
+import { getDb } from "@/lib/mongodb";
+import { COMMENT_SECTIONS } from "@/types/post";
+import type { Comment, CommentReply, CommentSection, Post } from "@/types/post";
+
+type MongoPostDocument = Omit<Post, "viewerHasLiked"> & {
+  _id?: string | ObjectId;
+  likedBy?: (string | ObjectId)[];
+};
+
+interface NormalisedPost extends Omit<Post, "viewerHasLiked"> {
+  likedBy: string[];
 }
 
-interface DbAccessorComment {
-  id?: unknown;
-  section?: unknown;
-  author?: unknown;
-  authorId?: unknown;
-  content?: unknown;
-  createdAt?: unknown;
-  replies?: unknown;
-}
+const POSTS_COLLECTION = "posts";
 
-interface DbAccessorPost {
-  id?: unknown;
-  title?: unknown;
-  summary?: unknown;
-  sourceUrl?: unknown;
-  tags?: unknown;
-  createdAt?: unknown;
-  likedBy?: unknown;
-  comments?: unknown;
-}
-
-function normaliseString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function normaliseStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
+function normaliseLikedBy(rawLikedBy: MongoPostDocument["likedBy"]): string[] {
+  if (!Array.isArray(rawLikedBy)) {
     return [];
   }
 
-  return value.filter((item): item is string => typeof item === "string");
+  return rawLikedBy
+    .map((value) => (value instanceof ObjectId ? value.toHexString() : String(value)))
+    .filter((value) => Boolean(value));
 }
 
-function normaliseCommentReply(reply: DbAccessorCommentReply): CommentReply {
+function ensurePostShape(rawPost: Partial<MongoPostDocument>): NormalisedPost {
+  const comments = Array.isArray(rawPost.comments)
+    ? rawPost.comments.map((comment) => ensureCommentShape(comment))
+    : [];
+
+  const idSource = rawPost.id ?? rawPost._id ?? "";
+  const id = idSource instanceof ObjectId ? idSource.toHexString() : String(idSource);
+  const parsedCreatedAt = rawPost.createdAt ? new Date(rawPost.createdAt) : null;
+  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+    ? parsedCreatedAt.toISOString()
+    : new Date().toISOString();
+
+  const likedBy = normaliseLikedBy(rawPost.likedBy);
+  const likes =
+    likedBy.length > 0
+      ? likedBy.length
+      : typeof rawPost.likes === "number" && Number.isFinite(rawPost.likes)
+        ? rawPost.likes
+        : 0;
+
   return {
-    id: normaliseString(reply.id),
-    parentId: normaliseString(reply.parentId),
-    author: normaliseString(reply.author),
-    authorId: typeof reply.authorId === "string" ? reply.authorId : undefined,
-    content: normaliseString(reply.content),
-    createdAt: normaliseString(reply.createdAt),
+    id,
+    title: String(rawPost.title ?? ""),
+    summary: String(rawPost.summary ?? ""),
+    sourceUrl: String(rawPost.sourceUrl ?? ""),
+    tags: Array.isArray(rawPost.tags) ? rawPost.tags.map((tag) => String(tag)) : [],
+    createdAt,
+    likes,
+    comments,
+    likedBy,
   };
 }
 
-function normaliseSection(section: unknown): CommentSection {
-  if (typeof section !== "string") {
-    return "analysis";
-  }
+function ensureReplyShape(
+  rawReply: Partial<CommentReply>,
+  fallbackParentId: string,
+): CommentReply {
+  const parsedCreatedAt = rawReply.createdAt ? new Date(rawReply.createdAt) : null;
+  const createdAt =
+    parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+      ? parsedCreatedAt.toISOString()
+      : new Date().toISOString();
 
-  const lowerCase = section.toLowerCase();
-  return (COMMENT_SECTIONS.find((value) => value === lowerCase) ?? "analysis") as CommentSection;
-}
-
-function normaliseComment(comment: DbAccessorComment): Comment {
-  const repliesValue = Array.isArray(comment.replies) ? comment.replies : [];
+  const parentId = rawReply.parentId ?? fallbackParentId;
 
   return {
-    id: normaliseString(comment.id),
-    section: normaliseSection(comment.section),
-    author: normaliseString(comment.author),
-    authorId: typeof comment.authorId === "string" ? comment.authorId : undefined,
-    content: normaliseString(comment.content),
-    createdAt: normaliseString(comment.createdAt),
-    replies: repliesValue.map((reply) => normaliseCommentReply(reply as DbAccessorCommentReply)),
+    id: String(rawReply.id ?? ""),
+    parentId: String(parentId ?? fallbackParentId),
+    author: rawReply.author ? String(rawReply.author) : "Anonyme",
+    authorId: rawReply.authorId ? String(rawReply.authorId) : undefined,
+    content: String(rawReply.content ?? ""),
+    createdAt,
   };
 }
 
-function normalisePost(post: DbAccessorPost, viewerId?: string | null): Post {
-  const likedBy = normaliseStringArray(post.likedBy);
-  const commentsValue = Array.isArray(post.comments) ? post.comments : [];
+function ensureCommentShape(rawComment: Partial<Comment>): Comment {
+  const defaultSection: CommentSection = "analysis";
+  const section = COMMENT_SECTIONS.includes((rawComment.section as CommentSection) ?? defaultSection)
+    ? ((rawComment.section as CommentSection) ?? defaultSection)
+    : defaultSection;
+
+  const parsedCreatedAt = rawComment.createdAt ? new Date(rawComment.createdAt) : null;
+  const createdAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+    ? parsedCreatedAt.toISOString()
+    : new Date().toISOString();
+
+  const commentId = String(rawComment.id ?? "");
+  const rawReplies =
+    rawComment && typeof rawComment === "object" && "replies" in rawComment
+      ? (rawComment as { replies?: CommentReply[] }).replies
+      : undefined;
+  const replies = Array.isArray(rawReplies)
+    ? rawReplies.map((reply) => ensureReplyShape(reply, commentId))
+    : [];
 
   return {
-    id: normaliseString(post.id),
-    title: normaliseString(post.title),
-    summary: normaliseString(post.summary),
-    sourceUrl: normaliseString(post.sourceUrl),
-    tags: normaliseStringArray(post.tags),
-    createdAt: normaliseString(post.createdAt),
-    likes: likedBy.length,
-    comments: commentsValue.map((comment) => normaliseComment(comment as DbAccessorComment)),
-    viewerHasLiked: viewerId ? likedBy.includes(viewerId) : undefined,
+    id: commentId,
+    section,
+    author: rawComment.author ? String(rawComment.author) : "Anonyme",
+    authorId: rawComment.authorId ? String(rawComment.authorId) : undefined,
+    content: String(rawComment.content ?? ""),
+    createdAt,
+    replies,
   };
 }
 
-async function expectJson<T>(response: Response): Promise<T> {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error("Réponse inattendue du service db-accessor");
-  }
-  return (await response.json()) as T;
-}
+function buildPostFilter(id: string): Filter<MongoPostDocument> {
+  const filters: Record<string, unknown>[] = [{ id }, { _id: id }];
 
-export async function readPosts(): Promise<Post[]> {
-  const viewer = await getCurrentUser().catch(() => null);
-  const response = await dbAccessorFetch("/posts");
-
-  if (!response.ok) {
-    throw new Error("Impossible de récupérer les publications.");
+  if (ObjectId.isValid(id)) {
+    filters.push({ _id: new ObjectId(id) });
   }
 
-  const payload = await expectJson<DbAccessorPost[]>(response);
-  return payload.map((post) => normalisePost(post, viewer?.id));
+  return { $or: filters } as Filter<MongoPostDocument>;
 }
 
-export async function readPostById(id: string): Promise<Post | null> {
-  const viewer = await getCurrentUser().catch(() => null);
-  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(id)}`);
+function toPostForViewer(post: NormalisedPost, viewerId?: string): Post {
+  const { likedBy, ...rest } = post;
+  const viewerHasLiked = viewerId ? likedBy.includes(viewerId) : undefined;
 
-  if (response.status === 404) {
+  return {
+    ...rest,
+    viewerHasLiked,
+  };
+}
+
+export async function readPosts(viewerId?: string): Promise<Post[]> {
+  const db = await getDb();
+  const documents = await db
+    .collection<MongoPostDocument>(POSTS_COLLECTION)
+    .find({})
+    .sort({ createdAt: -1 })
+    .toArray();
+
+  const normalised = documents.map((document) => ensurePostShape(document));
+  const posts = normalised.map((post) => toPostForViewer(post, viewerId));
+
+  return posts.sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+}
+
+export async function readPostById(id: string, viewerId?: string): Promise<Post | null> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const filter = buildPostFilter(id);
+
+  const document = await collection.findOne(filter);
+
+  if (!document) {
     return null;
   }
 
-  if (!response.ok) {
-    throw new Error("Impossible de récupérer la publication.");
-  }
-
-  const payload = await expectJson<DbAccessorPost>(response);
-  return normalisePost(payload, viewer?.id);
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised, viewerId);
 }
 
 export async function createPost(post: Post): Promise<Post> {
-  const payload = {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+
+  if (!post.id) {
+    throw new Error("Post id is required");
+  }
+
+  const document: MongoPostDocument = {
     id: post.id,
     title: post.title,
     summary: post.summary,
     sourceUrl: post.sourceUrl,
     tags: post.tags,
+    createdAt: post.createdAt,
+    likes: 0,
+    comments: post.comments.map((comment) => ensureCommentShape(comment)),
+    likedBy: [],
   };
 
-  const response = await dbAccessorFetch("/posts", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  await collection.insertOne({ ...document, _id: document.id });
 
-  if (!response.ok) {
-    throw new Error("Impossible de créer la publication.");
-  }
-
-  const result = await expectJson<DbAccessorPost>(response);
-  return normalisePost(result);
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised);
 }
 
-export async function togglePostLikeByUser(postId: string, userId: string): Promise<Post | null> {
-  const response = await dbAccessorFetch(`/posts/${encodeURIComponent(postId)}/like`, {
-    method: "POST",
-    body: JSON.stringify({ userId }),
-  });
+export async function findPostBySourceUrl(sourceUrl: string): Promise<Post | null> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
-  if (response.status === 404) {
+  const document = await collection.findOne({ sourceUrl });
+
+  if (!document) {
     return null;
   }
 
-  if (!response.ok) {
-    throw new Error("Impossible de mettre à jour le like de la publication.");
+  const normalised = ensurePostShape(document);
+  return toPostForViewer(normalised);
+}
+
+export async function postExistsBySourceUrl(sourceUrl: string): Promise<boolean> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+
+  const count = await collection.countDocuments({ sourceUrl }, { limit: 1 });
+
+  return count > 0;
+}
+
+export async function togglePostLikeByUser(
+  id: string,
+  userId: string,
+): Promise<{ post: Post | null; viewerHasLiked: boolean }> {
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
+  const filter = buildPostFilter(id);
+
+  const existingDocument = await collection.findOne(filter);
+
+  if (!existingDocument) {
+    return { post: null, viewerHasLiked: false };
   }
 
-  const post = await expectJson<DbAccessorPost>(response);
-  return normalisePost(post, userId);
+  const likedBy = normaliseLikedBy(existingDocument.likedBy);
+  const alreadyLiked = likedBy.includes(userId);
+
+  const removalTargets: (string | ObjectId)[] = [userId];
+
+  if (ObjectId.isValid(userId)) {
+    removalTargets.push(new ObjectId(userId));
+  }
+
+  const update = alreadyLiked
+    ? { $pull: { likedBy: { $in: removalTargets } } }
+    : { $addToSet: { likedBy: userId } };
+
+  const updateResult = await collection.updateOne(filter, update);
+
+  if (!updateResult.matchedCount) {
+    return { post: null, viewerHasLiked: alreadyLiked };
+  }
+
+  const updatedDocument = await collection.findOne(filter);
+
+  if (!updatedDocument) {
+    return { post: null, viewerHasLiked: alreadyLiked };
+  }
+
+  const normalised = ensurePostShape(updatedDocument);
+
+  return {
+    post: toPostForViewer(normalised, userId),
+    viewerHasLiked: !alreadyLiked,
+  };
 }
 
 export async function addCommentToPost(
@@ -176,24 +263,26 @@ export async function addCommentToPost(
   comment: Comment,
   viewerId?: string,
 ): Promise<Post | null> {
-  const response = await dbAccessorFetch(
-    `/posts/${encodeURIComponent(id)}/comments`,
-    {
-      method: "POST",
-      body: JSON.stringify({ comment }),
-    },
-  );
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
-  if (response.status === 404) {
+  const ensuredComment = ensureCommentShape(comment);
+  const filter = buildPostFilter(id);
+
+  const updateResult = await collection.updateOne(filter, { $push: { comments: ensuredComment } });
+
+  if (!updateResult.matchedCount) {
     return null;
   }
 
-  if (!response.ok) {
-    throw new Error("Impossible d'ajouter le commentaire.");
+  const updatedDocument = await collection.findOne(filter);
+
+  if (!updatedDocument) {
+    return null;
   }
 
-  const payload = await expectJson<DbAccessorPost>(response);
-  return normalisePost(payload, viewerId);
+  const normalised = ensurePostShape(updatedDocument);
+  return toPostForViewer(normalised, viewerId);
 }
 
 export async function addReplyToComment(
@@ -202,27 +291,27 @@ export async function addReplyToComment(
   reply: CommentReply,
   viewerId?: string,
 ): Promise<Post | null> {
-  const response = await dbAccessorFetch(
-    `/posts/${encodeURIComponent(id)}/comments`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        reply: {
-          ...reply,
-          parentId,
-        },
-      }),
-    },
-  );
+  const db = await getDb();
+  const collection = db.collection<MongoPostDocument>(POSTS_COLLECTION);
 
-  if (response.status === 404) {
+  const ensuredReply = ensureReplyShape(reply, parentId);
+  ensuredReply.parentId = parentId;
+
+  const filter = { ...buildPostFilter(id), "comments.id": parentId } as Filter<MongoPostDocument>;
+  const updateResult = await collection.updateOne(filter, {
+    $push: { "comments.$.replies": ensuredReply },
+  });
+
+  if (!updateResult.matchedCount) {
     return null;
   }
 
-  if (!response.ok) {
-    throw new Error("Impossible d'ajouter la réponse.");
+  const updatedDocument = await collection.findOne(buildPostFilter(id));
+
+  if (!updatedDocument) {
+    return null;
   }
 
-  const payload = await expectJson<DbAccessorPost>(response);
-  return normalisePost(payload, viewerId);
+  const normalised = ensurePostShape(updatedDocument);
+  return toPostForViewer(normalised, viewerId);
 }

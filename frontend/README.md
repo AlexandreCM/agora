@@ -5,13 +5,13 @@ Ce dépôt contient une première implémentation de l'application Agora avec Ne
 ## Démarrage
 
 ```bash
-export DB_ACCESSOR_API_URL="http://localhost:8080"
+export MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>/"
 
 npm install
 npm run dev
 ```
 
-L'application est ensuite disponible sur http://localhost:3000. Elle s'appuie désormais sur l'API `db-accessor` pour toutes les opérations de persistance.
+L'application est ensuite disponible sur http://localhost:3000. Une base de données MongoDB accessible via `MONGODB_URI` est requise.
 
 ## Interactions côté utilisateur
 
@@ -23,7 +23,7 @@ Sur la page d'accueil :
 
 ## Structure des données
 
-Les posts sont stockés par l'API `db-accessor` dans la collection `posts` avec la structure suivante :
+Les posts sont enregistrés dans la collection `posts` avec la structure suivante :
 
 ```json
 {

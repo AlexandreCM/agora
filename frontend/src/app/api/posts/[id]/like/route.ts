@@ -18,7 +18,8 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ message: "Authentification requise." }, { status: 401 });
   }
 
-  const updatedPost = await togglePostLikeByUser(postId, user.id);
+  const result = await togglePostLikeByUser(postId, user.id);
+  const updatedPost = result.post;
 
   if (!updatedPost) {
     return NextResponse.json({ message: "Publication introuvable." }, { status: 404 });

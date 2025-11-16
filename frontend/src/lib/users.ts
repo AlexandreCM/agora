@@ -1,45 +1,66 @@
-import { dbAccessorFetch } from "@/lib/db-accessor-client";
+import { ObjectId } from "mongodb";
+
+import { getDb } from "@/lib/mongodb";
 import type { User, UserWithPassword } from "@/types/user";
 
-async function expectJson<T>(response: Response): Promise<T> {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    throw new Error("Réponse inattendue du service db-accessor");
-  }
-  return (await response.json()) as T;
+interface UserDocument {
+  _id?: string | ObjectId;
+  id?: string;
+  name?: string;
+  email?: string;
+  passwordHash?: string;
+  createdAt?: string;
 }
 
-function normaliseEmail(email: string) {
-  return email.trim().toLowerCase();
+const COLLECTION_NAME = "users";
+
+function mapUser(document: UserDocument): User {
+  const idSource = document.id ?? document._id ?? "";
+  const id = idSource instanceof ObjectId ? idSource.toHexString() : String(idSource);
+  const createdAtDate = document.createdAt ? new Date(document.createdAt) : new Date();
+  const createdAt = Number.isNaN(createdAtDate.getTime())
+    ? new Date().toISOString()
+    : createdAtDate.toISOString();
+
+  return {
+    id,
+    name: document.name ? String(document.name) : "",
+    email: document.email ? String(document.email).toLowerCase() : "",
+    createdAt,
+  };
+}
+
+function mapUserWithPassword(document: UserDocument): UserWithPassword {
+  const user = mapUser(document);
+  const passwordHash = document.passwordHash ? String(document.passwordHash) : "";
+
+  return {
+    ...user,
+    passwordHash,
+  };
+}
+
+export async function getUserCollection() {
+  const db = await getDb();
+  return db.collection<UserDocument>(COLLECTION_NAME);
 }
 
 export async function getUserByEmail(email: string): Promise<UserWithPassword | null> {
-  const normalised = normaliseEmail(email);
-  const response = await dbAccessorFetch(`/users?email=${encodeURIComponent(normalised)}`);
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error("Impossible de récupérer l'utilisateur.");
-  }
-
-  return expectJson<UserWithPassword>(response);
+  const collection = await getUserCollection();
+  const document = await collection.findOne({ email: email.toLowerCase() });
+  return document ? mapUserWithPassword(document) : null;
 }
 
 export async function getUserById(id: string): Promise<User | null> {
-  const response = await dbAccessorFetch(`/users/${encodeURIComponent(id)}`);
+  const collection = await getUserCollection();
+  const filters: Record<string, unknown>[] = [{ id }];
 
-  if (response.status === 404) {
-    return null;
+  if (ObjectId.isValid(id)) {
+    filters.push({ _id: new ObjectId(id) });
   }
 
-  if (!response.ok) {
-    throw new Error("Impossible de récupérer l'utilisateur.");
-  }
-
-  return expectJson<User>(response);
+  const document = await collection.findOne({ $or: filters });
+  return document ? mapUser(document) : null;
 }
 
 interface CreateUserInput {
@@ -49,30 +70,26 @@ interface CreateUserInput {
 }
 
 export async function createUser(input: CreateUserInput): Promise<User> {
-  const payload = {
+  const collection = await getUserCollection();
+
+  const now = new Date().toISOString();
+  const user: UserWithPassword = {
+    id: new ObjectId().toHexString(),
     name: input.name.trim(),
-    email: normaliseEmail(input.email),
+    email: input.email.trim().toLowerCase(),
     passwordHash: input.passwordHash,
+    createdAt: now,
   };
 
-  const response = await dbAccessorFetch("/users", {
-    method: "POST",
-    body: JSON.stringify(payload),
+  await collection.insertOne({
+    ...user,
+    _id: new ObjectId(user.id),
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible de créer l'utilisateur.");
-  }
-
-  return expectJson<User>(response);
+  return mapUser(user);
 }
 
 export async function deleteUserSessions(userId: string) {
-  const response = await dbAccessorFetch(`/users/${encodeURIComponent(userId)}/sessions`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok && response.status !== 404) {
-    throw new Error("Impossible de révoquer les sessions de l'utilisateur.");
-  }
+  const db = await getDb();
+  await db.collection("sessions").deleteMany({ userId });
 }
