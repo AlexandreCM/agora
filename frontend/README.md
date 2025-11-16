@@ -38,7 +38,7 @@ Les posts sont enregistrés dans la collection `posts` avec la structure suivant
     {
       "id": "uuid",
       "section": "analysis",
-      "authorName": "Clara",
+      "author": "Clara",
       "authorId": "userId1",
       "content": "Point de vue détaillé sur la méthodologie",
       "createdAt": "2024-05-01T14:20:00.000Z",
@@ -46,7 +46,7 @@ Les posts sont enregistrés dans la collection `posts` avec la structure suivant
         {
           "id": "uuid",
           "parentId": "uuid",
-          "authorName": "David",
+          "author": "David",
           "authorId": "userId2",
           "content": "Merci pour cette analyse approfondie !",
           "createdAt": "2024-05-01T15:00:00.000Z"

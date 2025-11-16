@@ -28,8 +28,8 @@ public record PostDocument(
     public record PostCommentDocument(
             String id,
             String section,
-            String authorName,
             String authorId,
+            String authorName,
             String content,
             OffsetDateTime createdAt,
             List<PostCommentReplyDocument> replies) {
@@ -42,8 +42,8 @@ public record PostDocument(
     public record PostCommentReplyDocument(
             String id,
             String parentId,
-            String authorName,
             String authorId,
+            String authorName,
             String content,
             OffsetDateTime createdAt) {
     }
