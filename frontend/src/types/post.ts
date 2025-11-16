@@ -1,9 +1,9 @@
 export const COMMENT_SECTIONS = [
+  "avis",
   "analysis",
   "debate",
   "question",
   "proposal",
-  "avis",
 ] as const;
 
 export type CommentSection = (typeof COMMENT_SECTIONS)[number];
@@ -11,8 +11,8 @@ export type CommentSection = (typeof COMMENT_SECTIONS)[number];
 export interface CommentReply {
   id: string;
   parentId: string;
-  author: string;
-  authorId?: string;
+  authorId: string;
+  authorName: string;
   content: string;
   createdAt: string;
 }
@@ -20,8 +20,8 @@ export interface CommentReply {
 export interface Comment {
   id: string;
   section: CommentSection;
-  author: string;
-  authorId?: string;
+  authorId: string;
+  authorName: string;
   content: string;
   createdAt: string;
   replies: CommentReply[];
@@ -34,7 +34,7 @@ export interface Post {
   sourceUrl: string;
   tags: string[];
   createdAt: string;
-  likes: number;
+  updatedAt: string;
+  likedBy: string[];
   comments: Comment[];
-  viewerHasLiked?: boolean;
 }

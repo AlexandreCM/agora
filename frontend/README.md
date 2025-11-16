@@ -33,21 +33,22 @@ Les posts sont enregistrés dans la collection `posts` avec la structure suivant
   "sourceUrl": "https://lien-vers-le-rapport",
   "tags": ["France", "Politique"],
   "createdAt": "2024-05-01T12:00:00.000Z",
+  "updatedAt": "2024-05-01T12:00:00.000Z",
   "likedBy": ["userId1", "userId2"],
   "comments": [
     {
       "id": "uuid",
       "section": "analysis",
-      "author": "Clara",
       "authorId": "userId1",
+      "authorName": "Clara",
       "content": "Point de vue détaillé sur la méthodologie",
       "createdAt": "2024-05-01T14:20:00.000Z",
       "replies": [
         {
           "id": "uuid",
           "parentId": "uuid",
-          "author": "David",
           "authorId": "userId2",
+          "authorName": "David",
           "content": "Merci pour cette analyse approfondie !",
           "createdAt": "2024-05-01T15:00:00.000Z"
         }

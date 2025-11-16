@@ -37,9 +37,8 @@ interface PostDetailsProps {
 export function PostDetails({ post }: PostDetailsProps) {
   const router = useRouter();
   const { user } = useSession();
-  const [likes, setLikes] = useState(post.likes);
+  const [likedBy, setLikedBy] = useState<string[]>(post.likedBy);
   const [isLiking, setIsLiking] = useState(false);
-  const [hasLiked, setHasLiked] = useState(Boolean(post.viewerHasLiked));
   const [comments, setComments] = useState<Comment[]>(post.comments);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +59,8 @@ export function PostDetails({ post }: PostDetailsProps) {
   const isAuthenticated = Boolean(user);
   const commentsBySection = useMemo(() => groupComments(comments), [comments]);
   const activeComments = commentsBySection[activeTab];
+  const likes = likedBy.length;
+  const hasLiked = user ? likedBy.includes(user.id) : false;
 
   function toggleReplyForm(commentId: string) {
     if (!user) {
@@ -98,8 +99,7 @@ export function PostDetails({ post }: PostDetailsProps) {
       }
 
       const updatedPost = (await response.json()) as Post;
-      setLikes(updatedPost.likes);
-      setHasLiked(Boolean(updatedPost.viewerHasLiked));
+      setLikedBy(updatedPost.likedBy);
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
     } finally {
@@ -339,7 +339,7 @@ export function PostDetails({ post }: PostDetailsProps) {
                 return (
                   <li key={comment.id} className="comment-item">
                     <div className="comment-meta">
-                      <strong>{comment.author}</strong>
+                      <strong>{comment.authorName}</strong>
                       <time dateTime={comment.createdAt}>
                         {format(new Date(comment.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
                       </time>
@@ -360,7 +360,7 @@ export function PostDetails({ post }: PostDetailsProps) {
                           {visibleReplies.map((reply) => (
                             <li key={reply.id} className="comment-reply">
                               <div className="comment-reply-meta">
-                                <strong>{reply.author}</strong>
+                                <strong>{reply.authorName}</strong>
                                 <time dateTime={reply.createdAt}>
                                   {format(new Date(reply.createdAt), "d MMM yyyy 'à' HH'h'mm", { locale: fr })}
                                 </time>

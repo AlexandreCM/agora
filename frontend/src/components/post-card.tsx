@@ -14,11 +14,12 @@ interface PostCardProps {
 
 export function PostCard({ post }: PostCardProps) {
   const router = useRouter();
-  const [likes, setLikes] = useState(post.likes);
+  const [likedBy, setLikedBy] = useState<string[]>(post.likedBy);
   const [isLiking, setIsLiking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasLiked, setHasLiked] = useState(Boolean(post.viewerHasLiked));
   const { user } = useSession();
+  const likes = likedBy.length;
+  const hasLiked = user ? likedBy.includes(user.id) : false;
 
   function handleNavigate() {
     router.push(`/posts/${post.id}`);
@@ -57,8 +58,7 @@ export function PostCard({ post }: PostCardProps) {
       }
 
       const updatedPost = (await response.json()) as Post;
-      setLikes(updatedPost.likes);
-      setHasLiked(Boolean(updatedPost.viewerHasLiked));
+      setLikedBy(updatedPost.likedBy);
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Une erreur est survenue.");
     } finally {
